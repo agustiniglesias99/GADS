@@ -1,0 +1,225 @@
+import { useState } from 'react'
+import { MetricCard } from '../../components/ui/MetricCard'
+import { Badge } from '../../components/ui/Badge'
+import { Button } from '../../components/ui/Button'
+import { empleados, novedades as allNovedades } from '../../data/mockData'
+import { useAuth } from '../../context/AuthContext'
+import type { BadgeVariant, EstadoNovedad, TipoNovedad, Novedad } from '../../types'
+
+const tipoLabel: Record<TipoNovedad, string> = {
+  tardanza: 'Tardanza',
+  ausencia_injustificada: 'Ausencia injustificada',
+  ausencia_justificada: 'Ausencia justificada',
+  hora_extra_50: 'H. extra 50%',
+  hora_extra_100: 'H. extra 100%',
+  licencia: 'Licencia',
+  vacaciones: 'Vacaciones',
+  salida_anticipada: 'Salida anticipada',
+  sin_descanso: 'Sin descanso',
+  anomalia: 'Anomalía',
+}
+
+const estadoBadge: Record<EstadoNovedad, BadgeVariant> = {
+  pendiente: 'warn',
+  aprobada: 'success',
+  rechazada: 'danger',
+  justificada: 'info',
+}
+
+type DayType = 'ok' | 'warn' | 'danger' | 'info' | 'gray' | 'empty'
+const dayStyle: Record<DayType, { bg: string; color: string }> = {
+  ok:     { bg: '#dcfce7', color: '#166534' },
+  warn:   { bg: '#fef3c7', color: '#92400e' },
+  danger: { bg: '#fee2e2', color: '#991b1b' },
+  info:   { bg: '#dbeafe', color: '#1e40af' },
+  gray:   { bg: '#f0ede6', color: '#888780' },
+  empty:  { bg: 'transparent', color: 'transparent' },
+}
+
+const abril2025: [number, DayType][] = [
+  [0, 'empty'], [1, 'ok'], [2, 'ok'], [3, 'ok'], [4, 'ok'], [5, 'gray'], [6, 'gray'],
+  [7, 'ok'], [8, 'ok'], [9, 'warn'], [10, 'ok'], [11, 'ok'], [12, 'gray'], [13, 'gray'],
+  [14, 'warn'], [15, 'danger'], [16, 'ok'], [17, 'ok'], [18, 'info'], [19, 'gray'], [20, 'gray'],
+  [21, 'ok'], [22, 'danger'], [23, 'ok'], [24, 'ok'], [25, 'ok'], [26, 'gray'], [27, 'gray'],
+  [28, 'ok'], [29, 'ok'], [30, 'gray'],
+]
+
+function SolicitudModal({ onClose, onSave }: { onClose: () => void; onSave: (n: Novedad) => void }) {
+  const { user } = useAuth()
+  const [form, setForm] = useState({ tipo: 'vacaciones' as TipoNovedad, fechaDesde: '', fechaHasta: '', detalle: '' })
+
+  function handleSave() {
+    if (!form.fechaDesde) return
+    onSave({
+      id: `n${Date.now()}`,
+      empleadoId: user?.empleadoId ?? 'e1',
+      empleadoNombre: user?.nombre ?? '',
+      fecha: form.fechaDesde,
+      tipo: form.tipo,
+      detalle: form.detalle || `Desde ${form.fechaDesde}${form.fechaHasta ? ` hasta ${form.fechaHasta}` : ''}`,
+      origen: 'manual',
+      estado: 'pendiente',
+    })
+    onClose()
+  }
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200 }}
+      onClick={onClose}>
+      <div style={{ background: '#fff', borderRadius: 12, padding: 24, width: 440 }} onClick={e => e.stopPropagation()}>
+        <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 16 }}>Solicitar novedad</div>
+
+        <div style={{ marginBottom: 12 }}>
+          <label style={{ fontSize: 12, color: '#6b6b66', display: 'block', marginBottom: 4 }}>Tipo de solicitud</label>
+          <select value={form.tipo} onChange={e => setForm(f => ({ ...f, tipo: e.target.value as TipoNovedad }))}
+            style={{ width: '100%', fontSize: 13, padding: '7px 10px', borderRadius: 8, border: '1px solid #d4d2ca' }}>
+            <option value="vacaciones">Vacaciones</option>
+            <option value="licencia">Licencia</option>
+            <option value="ausencia_justificada">Ausencia justificada</option>
+          </select>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}>
+          {[['Fecha desde', 'fechaDesde'], ['Fecha hasta', 'fechaHasta']].map(([label, field]) => (
+            <div key={field}>
+              <label style={{ fontSize: 12, color: '#6b6b66', display: 'block', marginBottom: 4 }}>{label}</label>
+              <input type="date" value={form[field as 'fechaDesde' | 'fechaHasta']}
+                onChange={e => setForm(f => ({ ...f, [field]: e.target.value }))}
+                style={{ width: '100%', fontSize: 13, padding: '7px 10px', borderRadius: 8, border: '1px solid #d4d2ca' }} />
+            </div>
+          ))}
+        </div>
+        <div style={{ marginBottom: 16 }}>
+          <label style={{ fontSize: 12, color: '#6b6b66', display: 'block', marginBottom: 4 }}>Motivo (opcional)</label>
+          <textarea value={form.detalle} onChange={e => setForm(f => ({ ...f, detalle: e.target.value }))} rows={3}
+            style={{ width: '100%', fontSize: 13, padding: '7px 10px', borderRadius: 8, border: '1px solid #d4d2ca', resize: 'vertical' }} />
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+          <Button onClick={onClose}>Cancelar</Button>
+          <Button variant="primary" onClick={handleSave} disabled={!form.fechaDesde}>Enviar solicitud</Button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+export function MiPanel() {
+  const { user } = useAuth()
+  const emp = empleados.find(e => e.id === user?.empleadoId) ?? empleados[0]
+  const [misNovedades, setMisNovedades] = useState(allNovedades.filter(n => n.empleadoId === emp.id))
+  const [showModal, setShowModal] = useState(false)
+
+  const pendientes = misNovedades.filter(n => n.estado === 'pendiente').length
+
+  return (
+    <div style={{ padding: 24, maxWidth: 1100, margin: '0 auto' }}>
+      <div style={{ fontSize: 20, fontWeight: 600, marginBottom: 2 }}>Mi panel</div>
+      <div style={{ fontSize: 13, color: '#6b6b66', marginBottom: 20 }}>Abril 2025 — {emp.nombre}</div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '260px 1fr', gap: 16, alignItems: 'start' }}>
+        <div>
+          <div style={{ background: '#fff', border: '1px solid #e2e0d8', borderRadius: 12, padding: 18, marginBottom: 12 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14 }}>
+              <div style={{ width: 48, height: 48, borderRadius: '50%', background: '#dbeafe', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, fontWeight: 600, color: '#1d4ed8' }}>{emp.iniciales}</div>
+              <div>
+                <div style={{ fontSize: 15, fontWeight: 600 }}>{emp.nombre}</div>
+                <div style={{ fontSize: 12, color: '#6b6b66' }}>Legajo #{emp.legajo}</div>
+              </div>
+            </div>
+            <Badge variant="success">Activo</Badge>
+            <div style={{ height: 1, background: '#f0ede6', margin: '12px 0' }} />
+            {[
+              ['Categoría', emp.categoria],
+              ['Turno', emp.turno],
+              ['Ingreso', emp.ingreso],
+              ['Convenio', emp.convenio],
+            ].map(([l, v]) => (
+              <div key={l} style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0', fontSize: 13 }}>
+                <span style={{ color: '#6b6b66' }}>{l}</span>
+                <span style={{ fontWeight: 500 }}>{v}</span>
+              </div>
+            ))}
+          </div>
+          <Button variant="primary" onClick={() => setShowModal(true)} style={{ width: '100%', padding: '9px 14px' }}>
+            + Solicitar licencia / vacaciones
+          </Button>
+          {pendientes > 0 && (
+            <div style={{ marginTop: 12, background: '#fef3c7', borderRadius: 8, padding: '10px 12px', fontSize: 13, color: '#92400e' }}>
+              Tenés {pendientes} solicitud{pendientes > 1 ? 'es' : ''} pendiente{pendientes > 1 ? 's' : ''} de aprobación.
+            </div>
+          )}
+        </div>
+
+        <div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 10, marginBottom: 16 }}>
+            <MetricCard label="Días trabajados" value={17} sub="de 20 laborables" valueColor="success" />
+            <MetricCard label="Tardanzas" value={3} sub="42 min acumulados" valueColor="warn" />
+            <MetricCard label="Ausencias" value={2} sub="1 justificada" valueColor="danger" />
+            <MetricCard label="Horas extra" value="4h 15m" sub="al 50%" valueColor="info" />
+          </div>
+
+          <div style={{ background: '#fff', border: '1px solid #e2e0d8', borderRadius: 12, padding: 18, marginBottom: 16 }}>
+            <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 14 }}>Mi asistencia — Abril 2025</div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: 4 }}>
+              {['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'].map(d => (
+                <div key={d} style={{ fontSize: 11, color: '#888780', textAlign: 'center', padding: '3px 0', fontWeight: 600 }}>{d}</div>
+              ))}
+              {abril2025.map(([day, type], i) => (
+                <div key={i} style={{
+                  fontSize: 12, textAlign: 'center', padding: '6px 2px', borderRadius: 6,
+                  background: dayStyle[type].bg, color: dayStyle[type].color,
+                  opacity: type === 'empty' ? 0 : 1,
+                }}>
+                  {day === 0 ? '' : day}
+                </div>
+              ))}
+            </div>
+            <div style={{ display: 'flex', gap: 12, marginTop: 10, flexWrap: 'wrap' }}>
+              {[['#dcfce7', 'Presente'], ['#fef3c7', 'Tardanza'], ['#fee2e2', 'Ausente'], ['#dbeafe', 'H. Extra'], ['#f0ede6', 'No laborable']].map(([bg, label]) => (
+                <span key={label} style={{ fontSize: 11, display: 'flex', alignItems: 'center', gap: 4, color: '#6b6b66' }}>
+                  <span style={{ width: 10, height: 10, borderRadius: 2, background: bg, display: 'inline-block' }} />
+                  {label}
+                </span>
+              ))}
+            </div>
+          </div>
+
+          <div style={{ background: '#fff', border: '1px solid #e2e0d8', borderRadius: 12, padding: 18 }}>
+            <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 14 }}>Mis novedades</div>
+            {misNovedades.length === 0 ? (
+              <div style={{ fontSize: 13, color: '#888780', padding: '12px 0' }}>Sin novedades en el período.</div>
+            ) : (
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                <thead>
+                  <tr>
+                    {['Fecha', 'Tipo', 'Detalle', 'Estado'].map(h => (
+                      <th key={h} style={{ textAlign: 'left', fontWeight: 600, fontSize: 11, color: '#888780', textTransform: 'uppercase', letterSpacing: '0.04em', paddingBottom: 8, borderBottom: '1px solid #e2e0d8', paddingRight: 12 }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {misNovedades.map(n => (
+                    <tr key={n.id}>
+                      <td style={{ padding: '8px 12px 8px 0', borderBottom: '1px solid #f0ede6' }}>{n.fecha.split('-').reverse().join('/')}</td>
+                      <td style={{ padding: '8px 12px 8px 0', borderBottom: '1px solid #f0ede6' }}>{tipoLabel[n.tipo]}</td>
+                      <td style={{ padding: '8px 12px 8px 0', borderBottom: '1px solid #f0ede6', color: '#6b6b66' }}>{n.detalle}</td>
+                      <td style={{ padding: '8px 0', borderBottom: '1px solid #f0ede6' }}>
+                        <Badge variant={estadoBadge[n.estado]}>{n.estado.charAt(0).toUpperCase() + n.estado.slice(1)}</Badge>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {showModal && (
+        <SolicitudModal
+          onClose={() => setShowModal(false)}
+          onSave={n => { setMisNovedades(prev => [n, ...prev]); setShowModal(false) }}
+        />
+      )}
+    </div>
+  )
+}
