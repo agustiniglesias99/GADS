@@ -1,8 +1,11 @@
 import { useState } from 'react'
 import { Button } from '../../components/ui/Button'
 import { Badge } from '../../components/ui/Badge'
-import { novedades, resumenEmpleados } from '../../data/mockData'
-import type { TipoNovedad } from '../../types'
+import { MetricCard } from '../../components/ui/MetricCard'
+import { Loading, ErrorBox } from '../../components/ui/States'
+import { useQuery } from '../../lib/useQuery'
+import { fetchResumen, fetchNovedades } from '../../lib/api'
+import type { TipoNovedad, ResumenEmpleado, Novedad } from '../../types'
 
 const tipoLabel: Record<TipoNovedad, string> = {
   tardanza: 'Tardanza',
@@ -18,17 +21,23 @@ const tipoLabel: Record<TipoNovedad, string> = {
 }
 
 export function ExportarCSV() {
+  const { data, loading, error, reload } = useQuery(async () => {
+    const [resumen, novedades] = await Promise.all([fetchResumen(), fetchNovedades()])
+    return { resumen, novedades: novedades.filter(n => n.estado === 'aprobada') }
+  }, [])
+
   const [fechaDesde, setFechaDesde] = useState('2025-04-01')
   const [fechaHasta, setFechaHasta] = useState('2025-04-30')
-  const [filtered, setFiltered] = useState(resumenEmpleados)
-  const [novedadesFiltradas, setNovedadesFiltradas] = useState(novedades.filter(n => n.estado === 'aprobada'))
+  const [filtered, setFiltered] = useState<ResumenEmpleado[]>([])
+  const [novedadesFiltradas, setNovedadesFiltradas] = useState<Novedad[]>([])
   const [hasSearched, setHasSearched] = useState(false)
 
   function handleFilter() {
-    const novsFiltradas = novedades.filter(n => n.estado === 'aprobada' && n.fecha >= fechaDesde && n.fecha <= fechaHasta)
+    const resumen = data?.resumen ?? []
+    const novsFiltradas = (data?.novedades ?? []).filter(n => n.fecha >= fechaDesde && n.fecha <= fechaHasta)
     setNovedadesFiltradas(novsFiltradas)
     const empleadosConNovedad = new Set(novsFiltradas.map(n => n.empleadoId))
-    setFiltered(resumenEmpleados.filter(r => empleadosConNovedad.has(r.empleadoId) || r.diasTrabajados > 0))
+    setFiltered(resumen.filter(r => empleadosConNovedad.has(r.empleadoId) || r.diasTrabajados > 0))
     setHasSearched(true)
   }
 
@@ -58,7 +67,7 @@ export function ExportarCSV() {
   function handleDownloadDetalle() {
     const headers = ['Legajo', 'Empleado', 'Fecha', 'Tipo', 'Detalle', 'Origen', 'Estado']
     const rows = novedadesFiltradas.map(n => {
-      const emp = resumenEmpleados.find(r => r.empleadoId === n.empleadoId)
+      const emp = (data?.resumen ?? []).find(r => r.empleadoId === n.empleadoId)
       return [emp?.legajo ?? '', n.empleadoNombre, n.fecha, tipoLabel[n.tipo], n.detalle, n.origen, n.estado]
     })
     const csv = [headers, ...rows].map(row => row.map(cell => `"${cell}"`).join(',')).join('\n')
@@ -71,8 +80,11 @@ export function ExportarCSV() {
     URL.revokeObjectURL(url)
   }
 
+  if (loading) return <div style={{ padding: '24px 32px' }}><Loading /></div>
+  if (error) return <div style={{ padding: '24px 32px' }}><ErrorBox message={error} onRetry={reload} /></div>
+
   return (
-    <div style={{ padding: 24, maxWidth: 1000, margin: '0 auto' }}>
+    <div style={{ padding: '24px 32px' }}>
       <div style={{ fontSize: 20, fontWeight: 600, marginBottom: 2 }}>Exportar liquidación</div>
       <div style={{ fontSize: 13, color: '#6b6b66', marginBottom: 20 }}>Descargá el archivo CSV de novedades para armar la liquidación salarial</div>
 
@@ -93,19 +105,12 @@ export function ExportarCSV() {
       {hasSearched && (
         <>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 12, marginBottom: 16 }}>
-            <div style={{ background: '#eeece6', borderRadius: 10, padding: '14px 16px' }}>
-              <div style={{ fontSize: 11, color: '#888780', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6, fontWeight: 500 }}>Empleados</div>
-              <div style={{ fontSize: 26, fontWeight: 600 }}>{filtered.length}</div>
-              <div style={{ fontSize: 12, color: '#6b6b66', marginTop: 5 }}>en el período</div>
-            </div>
-            <div style={{ background: '#eeece6', borderRadius: 10, padding: '14px 16px' }}>
-              <div style={{ fontSize: 11, color: '#888780', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6, fontWeight: 500 }}>Novedades</div>
-              <div style={{ fontSize: 26, fontWeight: 600, color: '#15803d' }}>{novedadesFiltradas.length}</div>
-              <div style={{ fontSize: 12, color: '#6b6b66', marginTop: 5 }}>aprobadas</div>
-            </div>
-            <div style={{ background: '#eeece6', borderRadius: 10, padding: '14px 16px' }}>
-              <div style={{ fontSize: 11, color: '#888780', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6, fontWeight: 500 }}>Período</div>
-              <div style={{ fontSize: 14, fontWeight: 600, marginTop: 6 }}>{fechaDesde} / {fechaHasta}</div>
+            <MetricCard label="Empleados" value={filtered.length} sub="en el período" />
+            <MetricCard label="Novedades" value={novedadesFiltradas.length} sub="aprobadas" valueColor="success" />
+            <div className="metric" style={{ position: 'relative', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: '15px 16px 15px 18px', boxShadow: 'var(--shadow-xs)' }}>
+              <span style={{ position: 'absolute', left: 0, top: 12, bottom: 12, width: 3, borderRadius: 3, background: '#cfccc2' }} />
+              <div style={{ fontSize: 11, color: '#8f8d84', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8, fontWeight: 600 }}>Período</div>
+              <div style={{ fontSize: 15, fontWeight: 700, marginTop: 4 }}>{fechaDesde} / {fechaHasta}</div>
             </div>
           </div>
 

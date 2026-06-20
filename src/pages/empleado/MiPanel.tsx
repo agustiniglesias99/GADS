@@ -2,7 +2,9 @@ import { useState } from 'react'
 import { MetricCard } from '../../components/ui/MetricCard'
 import { Badge } from '../../components/ui/Badge'
 import { Button } from '../../components/ui/Button'
-import { empleados, novedades as allNovedades } from '../../data/mockData'
+import { Loading, ErrorBox } from '../../components/ui/States'
+import { useQuery } from '../../lib/useQuery'
+import { fetchEmpleado, fetchNovedadesByEmpleado, createNovedad } from '../../lib/api'
 import { useAuth } from '../../context/AuthContext'
 import type { BadgeVariant, EstadoNovedad, TipoNovedad, Novedad } from '../../types'
 
@@ -48,25 +50,35 @@ function SolicitudModal({ onClose, onSave }: { onClose: () => void; onSave: (n: 
   const { user } = useAuth()
   const [form, setForm] = useState({ tipo: 'vacaciones' as TipoNovedad, fechaDesde: '', fechaHasta: '', detalle: '' })
 
-  function handleSave() {
-    if (!form.fechaDesde) return
-    onSave({
-      id: `n${Date.now()}`,
-      empleadoId: user?.empleadoId ?? 'e1',
-      empleadoNombre: user?.nombre ?? '',
-      fecha: form.fechaDesde,
-      tipo: form.tipo,
-      detalle: form.detalle || `Desde ${form.fechaDesde}${form.fechaHasta ? ` hasta ${form.fechaHasta}` : ''}`,
-      origen: 'manual',
-      estado: 'pendiente',
-    })
-    onClose()
+  const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState('')
+
+  async function handleSave() {
+    if (!form.fechaDesde || !user?.empleadoId) return
+    setSaving(true)
+    setSaveError('')
+    try {
+      const created = await createNovedad({
+        empleadoId: user.empleadoId,
+        empleadoNombre: user.nombre,
+        fecha: form.fechaDesde,
+        tipo: form.tipo,
+        detalle: form.detalle || `Desde ${form.fechaDesde}${form.fechaHasta ? ` hasta ${form.fechaHasta}` : ''}`,
+        origen: 'manual',
+        estado: 'pendiente',
+      })
+      onSave(created)
+      onClose()
+    } catch (e) {
+      setSaveError(e instanceof Error ? e.message : String(e))
+      setSaving(false)
+    }
   }
 
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200 }}
+    <div className="modal-overlay" style={{ position: 'fixed', inset: 0, background: 'rgba(26,24,20,0.38)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200, padding: 20 }}
       onClick={onClose}>
-      <div style={{ background: '#fff', borderRadius: 12, padding: 24, width: 440 }} onClick={e => e.stopPropagation()}>
+      <div className="modal-card" style={{ background: '#fff', borderRadius: 16, padding: 24, width: 440, boxShadow: 'var(--shadow-lg)', border: '1px solid var(--border)' }} onClick={e => e.stopPropagation()}>
         <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 16 }}>Solicitar novedad</div>
 
         <div style={{ marginBottom: 12 }}>
@@ -93,9 +105,12 @@ function SolicitudModal({ onClose, onSave }: { onClose: () => void; onSave: (n: 
           <textarea value={form.detalle} onChange={e => setForm(f => ({ ...f, detalle: e.target.value }))} rows={3}
             style={{ width: '100%', fontSize: 13, padding: '7px 10px', borderRadius: 8, border: '1px solid #d4d2ca', resize: 'vertical' }} />
         </div>
+        {saveError && (
+          <div style={{ background: '#fdeaea', border: '1px solid #f6cdcd', color: '#991b1b', borderRadius: 8, padding: '8px 10px', fontSize: 12, marginBottom: 12 }}>{saveError}</div>
+        )}
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-          <Button onClick={onClose}>Cancelar</Button>
-          <Button variant="primary" onClick={handleSave} disabled={!form.fechaDesde}>Enviar solicitud</Button>
+          <Button onClick={onClose} disabled={saving}>Cancelar</Button>
+          <Button variant="primary" onClick={handleSave} disabled={!form.fechaDesde || saving}>{saving ? 'Enviando…' : 'Enviar solicitud'}</Button>
         </div>
       </div>
     </div>
@@ -104,14 +119,27 @@ function SolicitudModal({ onClose, onSave }: { onClose: () => void; onSave: (n: 
 
 export function MiPanel() {
   const { user } = useAuth()
-  const emp = empleados.find(e => e.id === user?.empleadoId) ?? empleados[0]
-  const [misNovedades, setMisNovedades] = useState(allNovedades.filter(n => n.empleadoId === emp.id))
+  const empleadoId = user?.empleadoId
+  const { data, loading, error, reload, setData } = useQuery(async () => {
+    if (!empleadoId) return { emp: null, novedades: [] }
+    const [emp, novedades] = await Promise.all([
+      fetchEmpleado(empleadoId), fetchNovedadesByEmpleado(empleadoId),
+    ])
+    return { emp, novedades }
+  }, [empleadoId])
   const [showModal, setShowModal] = useState(false)
 
+  if (loading) return <div style={{ padding: '24px 32px' }}><Loading /></div>
+  if (error) return <div style={{ padding: '24px 32px' }}><ErrorBox message={error} onRetry={reload} /></div>
+
+  const emp = data?.emp ?? null
+  const misNovedades = data?.novedades ?? []
   const pendientes = misNovedades.filter(n => n.estado === 'pendiente').length
 
+  if (!emp) return <div style={{ padding: '24px 32px', color: '#8f8d84', fontSize: 14 }}>No se encontró tu legajo asociado. Avisá a RRHH.</div>
+
   return (
-    <div style={{ padding: 24, maxWidth: 1100, margin: '0 auto' }}>
+    <div style={{ padding: '24px 32px' }}>
       <div style={{ fontSize: 20, fontWeight: 600, marginBottom: 2 }}>Mi panel</div>
       <div style={{ fontSize: 13, color: '#6b6b66', marginBottom: 20 }}>Abril 2025 — {emp.nombre}</div>
 
@@ -217,7 +245,7 @@ export function MiPanel() {
       {showModal && (
         <SolicitudModal
           onClose={() => setShowModal(false)}
-          onSave={n => { setMisNovedades(prev => [n, ...prev]); setShowModal(false) }}
+          onSave={n => { setData(d => ({ ...d!, novedades: [n, ...(d?.novedades ?? [])] })); setShowModal(false) }}
         />
       )}
     </div>

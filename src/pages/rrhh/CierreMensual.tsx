@@ -2,12 +2,30 @@ import { useState } from 'react'
 import { MetricCard } from '../../components/ui/MetricCard'
 import { Badge } from '../../components/ui/Badge'
 import { Button } from '../../components/ui/Button'
-import { cierresMensuales, resumenEmpleados, novedades } from '../../data/mockData'
+import { Loading, ErrorBox } from '../../components/ui/States'
+import { useQuery } from '../../lib/useQuery'
+import { fetchCierres, fetchResumen, fetchNovedades } from '../../lib/api'
 
 export function CierreMensual() {
+  const { data, loading, error, reload } = useQuery(async () => {
+    const [cierres, resumen, novedades] = await Promise.all([
+      fetchCierres(), fetchResumen(), fetchNovedades(),
+    ])
+    return { cierres, resumen, novedades }
+  }, [])
   const [periodo, setPeriodo] = useState('Abril 2025')
+
+  if (loading) return <div style={{ padding: '24px 32px' }}><Loading /></div>
+  if (error) return <div style={{ padding: '24px 32px' }}><ErrorBox message={error} onRetry={reload} /></div>
+
+  const cierresMensuales = data!.cierres
+  const resumenEmpleados = data!.resumen
+  const novedades = data!.novedades
   const cierre = cierresMensuales.find(c => c.periodo === periodo) ?? cierresMensuales[0]
   const pendientes = novedades.filter(n => n.estado === 'pendiente').length
+
+  if (!cierre) return <div style={{ padding: '24px 32px', color: '#8f8d84', fontSize: 14 }}>No hay períodos de cierre cargados.</div>
+
   const cerrado = cierre.estado === 'cerrado'
   const puedeEjecutar = pendientes === 0 && !cerrado
 
@@ -37,7 +55,7 @@ export function CierreMensual() {
   }
 
   return (
-    <div style={{ padding: 24, maxWidth: 1200, margin: '0 auto' }}>
+    <div style={{ padding: '24px 32px' }}>
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 20 }}>
         <div>
           <div style={{ fontSize: 20, fontWeight: 600 }}>Cierre mensual</div>

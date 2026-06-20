@@ -1,8 +1,9 @@
-import { useState } from 'react'
 import { MetricCard } from '../../components/ui/MetricCard'
 import { Badge } from '../../components/ui/Badge'
 import { Button } from '../../components/ui/Button'
-import { novedades, empleados, registrosDia } from '../../data/mockData'
+import { Loading, ErrorBox } from '../../components/ui/States'
+import { useQuery } from '../../lib/useQuery'
+import { fetchNovedades, fetchEmpleados, fetchRegistros, setNovedadEstado } from '../../lib/api'
 import type { BadgeVariant, EstadoNovedad, TipoNovedad } from '../../types'
 
 const tipoLabel: Record<TipoNovedad, string> = {
@@ -48,7 +49,21 @@ interface Props {
 }
 
 export function Dashboard({ onNavigate }: Props) {
-  const [novedadesData, setNovedadesData] = useState(novedades)
+  const { data, loading, error, reload, setData } = useQuery(async () => {
+    const [novedades, empleados, registros] = await Promise.all([
+      fetchNovedades(), fetchEmpleados(), fetchRegistros(),
+    ])
+    return { novedades, empleados, registros }
+  }, [])
+
+  async function aprobar(id: string) {
+    await setNovedadEstado(id, 'aprobada')
+    setData(d => ({ ...d!, novedades: d!.novedades.map(x => x.id === id ? { ...x, estado: 'aprobada' } : x) }))
+  }
+
+  const novedadesData = data?.novedades ?? []
+  const empleados = data?.empleados ?? []
+  const registrosDia = data?.registros ?? []
   const pendientes = novedadesData.filter(n => n.estado === 'pendiente')
   const ultimasNovedades = [...novedadesData].sort((a, b) => b.fecha.localeCompare(a.fecha)).slice(0, 5)
   const fichadas = registrosDia.filter(r => r.fecha === '2025-04-14')
@@ -56,9 +71,12 @@ export function Dashboard({ onNavigate }: Props) {
   const ausentes = fichadas.filter(r => r.estado === 'ausente').length
 
   return (
-    <div style={{ padding: 24, maxWidth: 1200, margin: '0 auto' }}>
+    <div style={{ padding: '24px 32px' }}>
       <div style={{ fontSize: 20, fontWeight: 600, marginBottom: 2 }}>Dashboard</div>
       <div style={{ fontSize: 13, color: '#6b6b66', marginBottom: 20 }}>Abril 2025 — Empresa: Metalúrgica San Justo S.R.L.</div>
+
+      {loading ? <Loading /> : error ? <ErrorBox message={error} onRetry={reload} /> : (
+      <>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12, marginBottom: 20 }}>
         <MetricCard label="Empleados activos" value={empleados.filter(e => e.estado === 'activo').length} sub="1 suspendido" />
@@ -89,9 +107,7 @@ export function Dashboard({ onNavigate }: Props) {
                   </td>
                   <td style={{ padding: '9px 0', borderBottom: '1px solid #f0ede6' }}>
                     {n.estado === 'pendiente' && (
-                      <Button variant="sm" onClick={() => {
-                        setNovedadesData(prev => prev.map(x => x.id === n.id ? { ...x, estado: 'aprobada' } : x))
-                      }}>Aprobar</Button>
+                      <Button variant="sm" onClick={() => aprobar(n.id)}>Aprobar</Button>
                     )}
                   </td>
                 </tr>
@@ -149,6 +165,8 @@ export function Dashboard({ onNavigate }: Props) {
           </tbody>
         </table>
       </div>
+      </>
+      )}
     </div>
   )
 }

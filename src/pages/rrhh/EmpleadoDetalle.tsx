@@ -1,8 +1,9 @@
-import { useState } from 'react'
 import { MetricCard } from '../../components/ui/MetricCard'
 import { Badge } from '../../components/ui/Badge'
 import { Button } from '../../components/ui/Button'
-import { empleados, novedades } from '../../data/mockData'
+import { Loading, ErrorBox } from '../../components/ui/States'
+import { useQuery } from '../../lib/useQuery'
+import { fetchEmpleado, fetchNovedadesByEmpleado, setNovedadEstado } from '../../lib/api'
 import type { BadgeVariant, EstadoNovedad, TipoNovedad } from '../../types'
 
 const tipoLabel: Record<TipoNovedad, string> = {
@@ -50,17 +51,32 @@ interface Props {
 }
 
 export function EmpleadoDetalle({ empleadoId, onBack }: Props) {
-  const emp = empleados.find(e => e.id === empleadoId)
-  const [novedadesData, setNovedadesData] = useState(novedades.filter(n => n.empleadoId === empleadoId))
+  const { data, loading, error, reload, setData } = useQuery(async () => {
+    const [emp, novedades] = await Promise.all([
+      fetchEmpleado(empleadoId), fetchNovedadesByEmpleado(empleadoId),
+    ])
+    return { emp, novedades }
+  }, [empleadoId])
 
-  if (!emp) return null
+  const emp = data?.emp ?? null
+  const novedadesData = data?.novedades ?? []
 
-  function aprobar(id: string) {
-    setNovedadesData(prev => prev.map(n => n.id === id ? { ...n, estado: 'aprobada' } : n))
+  async function aprobar(id: string) {
+    await setNovedadEstado(id, 'aprobada')
+    setData(d => ({ ...d!, novedades: d!.novedades.map(n => n.id === id ? { ...n, estado: 'aprobada' } : n) }))
   }
 
+  if (loading) return <div style={{ padding: '24px 32px' }}><Loading /></div>
+  if (error) return <div style={{ padding: '24px 32px' }}><ErrorBox message={error} onRetry={reload} /></div>
+  if (!emp) return (
+    <div style={{ padding: '24px 32px' }}>
+      <button onClick={onBack} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6b6b66', fontSize: 13, marginBottom: 12 }}>← Empleados</button>
+      <div style={{ color: '#8f8d84', fontSize: 14 }}>No se encontró el empleado.</div>
+    </div>
+  )
+
   return (
-    <div style={{ padding: 24, maxWidth: 1200, margin: '0 auto' }}>
+    <div style={{ padding: '24px 32px' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20, fontSize: 13, color: '#6b6b66' }}>
         <button onClick={onBack} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6b6b66', fontSize: 13 }}>Empleados</button>
         <span>/</span>

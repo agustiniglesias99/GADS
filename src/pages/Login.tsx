@@ -1,88 +1,119 @@
 import { useState } from 'react'
 import { useAuth } from '../context/AuthContext'
-import { empleados } from '../data/mockData'
-import type { Role } from '../types'
 import { Button } from '../components/ui/Button'
 
-export function Login() {
-  const { login } = useAuth()
-  const [selectedRole, setSelectedRole] = useState<Role | null>(null)
-  const [selectedEmpleadoId, setSelectedEmpleadoId] = useState(empleados[0].id)
+const demoHints = [
+  { icon: '🏢', label: 'RRHH Administrativo', email: 'rrhh@arcade.com' },
+  { icon: '📊', label: 'Contador Externo', email: 'contador@arcade.com' },
+  { icon: '👤', label: 'Empleado', email: 'juan.perez@empresa.com' },
+]
 
-  function handleLogin() {
-    if (!selectedRole) return
-    if (selectedRole === 'empleado') {
-      const emp = empleados.find(e => e.id === selectedEmpleadoId)
-      login('empleado', emp?.id, emp?.nombre)
-    } else {
-      login(selectedRole)
+export function Login() {
+  const { signIn } = useAuth()
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [error, setError] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    setSubmitting(true)
+    setError('')
+    const { error } = await signIn(email, password)
+    if (error) {
+      setError(error === 'Invalid login credentials' ? 'Email o contraseña incorrectos.' : error)
+      setSubmitting(false)
     }
+    // on success, AuthProvider flips `user` and App renders the role view
   }
 
-  const roles: { id: Role; label: string; desc: string; icon: string }[] = [
-    { id: 'rrhh', label: 'RRHH Administrativo', desc: 'Dashboard completo, gestión de fichadas, novedades y cierre mensual', icon: '🏢' },
-    { id: 'empleado', label: 'Empleado', desc: 'Ver asistencia personal, novedades y solicitar licencias o vacaciones', icon: '👤' },
-    { id: 'contador', label: 'Contador Externo', desc: 'Descargar archivo CSV de novedades para liquidación salarial', icon: '📊' },
-  ]
-
   return (
-    <div style={{ minHeight: '100svh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f5f5f0' }}>
-      <div style={{ width: 480 }}>
-        <div style={{ textAlign: 'center', marginBottom: 32 }}>
-          <div style={{ fontSize: 28, fontWeight: 700, color: '#1a1a18', letterSpacing: '-0.5px' }}>ARCADE</div>
-          <div style={{ fontSize: 14, color: '#6b6b66', marginTop: 6 }}>Gestión de novedades de empleados</div>
+    <div style={{
+      minHeight: '100svh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24,
+      background:
+        'radial-gradient(900px 500px at 80% -10%, rgba(79,70,229,0.10), transparent 60%),' +
+        'radial-gradient(800px 450px at -10% 110%, rgba(180,83,9,0.07), transparent 55%),' +
+        '#f4f3ee',
+    }}>
+      <div style={{ width: 400, animation: 'pageIn 0.4s var(--ease) both' }}>
+        <div style={{ textAlign: 'center', marginBottom: 26 }}>
+          <div style={{
+            width: 52, height: 52, borderRadius: 15, margin: '0 auto 14px',
+            background: 'linear-gradient(135deg, #2a2a26 0%, #000 100%)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            color: '#fff', fontSize: 26, fontWeight: 800,
+            boxShadow: '0 10px 28px rgba(0,0,0,0.22)',
+          }}>A</div>
+          <div style={{ fontSize: 26, fontWeight: 800, color: '#1a1a18', letterSpacing: '-0.02em' }}>ARCADE</div>
+          <div style={{ fontSize: 14, color: '#6b6b66', marginTop: 5 }}>Gestión de novedades de empleados</div>
         </div>
 
-        <div style={{ background: '#fff', border: '1px solid #e2e0d8', borderRadius: 16, padding: 28 }}>
-          <div style={{ fontSize: 13, fontWeight: 600, color: '#1a1a18', marginBottom: 14 }}>Seleccionar rol</div>
+        <form onSubmit={handleSubmit} style={{ background: '#fff', border: '1px solid var(--border)', borderRadius: 18, padding: 28, boxShadow: 'var(--shadow-md)' }}>
+          <div style={{ fontSize: 15, fontWeight: 700, color: '#1a1a18', marginBottom: 4 }}>Iniciar sesión</div>
+          <div style={{ fontSize: 12.5, color: '#6b6b66', marginBottom: 20 }}>Ingresá con el email y la contraseña de tu cuenta.</div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 20 }}>
-            {roles.map(role => (
-              <button
-                key={role.id}
-                onClick={() => setSelectedRole(role.id)}
-                style={{
-                  display: 'flex', alignItems: 'flex-start', gap: 12, padding: '14px 16px',
-                  borderRadius: 10, border: `2px solid ${selectedRole === role.id ? '#1a1a18' : '#e2e0d8'}`,
-                  background: selectedRole === role.id ? '#fafaf8' : '#fff',
-                  cursor: 'pointer', textAlign: 'left', width: '100%',
-                }}
-              >
-                <span style={{ fontSize: 20, flexShrink: 0, marginTop: 1 }}>{role.icon}</span>
-                <div>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: '#1a1a18' }}>{role.label}</div>
-                  <div style={{ fontSize: 12, color: '#6b6b66', marginTop: 2 }}>{role.desc}</div>
-                </div>
-              </button>
-            ))}
+          <div style={{ marginBottom: 14 }}>
+            <label htmlFor="login-email" style={{ fontSize: 12, fontWeight: 500, color: '#6b6b66', display: 'block', marginBottom: 6 }}>Email</label>
+            <input
+              id="login-email"
+              type="email"
+              autoFocus
+              autoComplete="username"
+              value={email}
+              onChange={e => { setEmail(e.target.value); setError('') }}
+              placeholder="tu@empresa.com"
+              style={{ width: '100%', fontSize: 13.5, padding: '10px 12px', borderRadius: 10, border: '1px solid var(--border-strong)', background: '#fff' }}
+            />
           </div>
 
-          {selectedRole === 'empleado' && (
-            <div style={{ marginBottom: 20 }}>
-              <label style={{ fontSize: 12, color: '#6b6b66', display: 'block', marginBottom: 6 }}>Empleado</label>
-              <select
-                value={selectedEmpleadoId}
-                onChange={e => setSelectedEmpleadoId(e.target.value)}
-                style={{
-                  width: '100%', fontSize: 13, padding: '8px 10px', borderRadius: 8,
-                  border: '1px solid #d4d2ca', background: '#fff', color: '#1a1a18',
-                }}
-              >
-                {empleados.filter(e => e.estado === 'activo').map(e => (
-                  <option key={e.id} value={e.id}>{e.nombre} — Legajo #{e.legajo}</option>
-                ))}
-              </select>
+          <div style={{ marginBottom: 18 }}>
+            <label htmlFor="login-password" style={{ fontSize: 12, fontWeight: 500, color: '#6b6b66', display: 'block', marginBottom: 6 }}>Contraseña</label>
+            <input
+              id="login-password"
+              type="password"
+              autoComplete="current-password"
+              value={password}
+              onChange={e => { setPassword(e.target.value); setError('') }}
+              placeholder="••••••••"
+              style={{ width: '100%', fontSize: 13.5, padding: '10px 12px', borderRadius: 10, border: '1px solid var(--border-strong)', background: '#fff' }}
+            />
+          </div>
+
+          {error && (
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, background: '#fdeaea', border: '1px solid #f6cdcd', color: '#991b1b', borderRadius: 10, padding: '9px 12px', fontSize: 12.5, marginBottom: 16 }}>
+              <span style={{ flexShrink: 0 }}>⚠</span>
+              <span>{error}</span>
             </div>
           )}
 
           <Button
+            type="submit"
             variant="primary"
-            disabled={!selectedRole}
-            onClick={handleLogin}
-            style={{ width: '100%', padding: '10px 14px', fontSize: 13 }}
+            disabled={!email || !password || submitting}
+            style={{ width: '100%', padding: '11px 14px', fontSize: 13.5 }}
           >
-            Ingresar
+            {submitting ? 'Ingresando…' : 'Ingresar'}
           </Button>
+        </form>
+
+        <div style={{ marginTop: 16, background: 'rgba(255,255,255,0.6)', border: '1px solid var(--border)', borderRadius: 14, padding: '12px 14px' }}>
+          <div style={{ fontSize: 11, fontWeight: 600, color: '#8f8d84', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>Cuentas de ejemplo</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            {demoHints.map(d => (
+              <button
+                key={d.label}
+                type="button"
+                className="nav-btn"
+                onClick={() => { setEmail(d.email); setError('') }}
+                style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 8px', borderRadius: 8, textAlign: 'left', width: '100%' }}
+              >
+                <span style={{ fontSize: 15, width: 22, textAlign: 'center', flexShrink: 0 }}>{d.icon}</span>
+                <span style={{ fontSize: 12.5, fontWeight: 600, color: '#1a1a18', flex: 1 }}>{d.label}</span>
+                <span style={{ fontSize: 11.5, color: '#6b6b66', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}>{d.email}</span>
+              </button>
+            ))}
+          </div>
+          <div style={{ fontSize: 11, color: '#8f8d84', marginTop: 8 }}>Tocá una cuenta para autocompletar el email. Usá la contraseña que definiste en Supabase.</div>
         </div>
       </div>
     </div>

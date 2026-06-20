@@ -1,7 +1,10 @@
 import { useState } from 'react'
 import { Badge } from '../../components/ui/Badge'
 import { Button } from '../../components/ui/Button'
-import { novedades as initialNovedades } from '../../data/mockData'
+import { MetricCard } from '../../components/ui/MetricCard'
+import { Loading, ErrorBox } from '../../components/ui/States'
+import { useQuery } from '../../lib/useQuery'
+import { fetchNovedades, setNovedadEstado, createNovedad } from '../../lib/api'
 import type { BadgeVariant, EstadoNovedad, TipoNovedad, Novedad } from '../../types'
 
 const tipoLabel: Record<TipoNovedad, string> = {
@@ -33,9 +36,9 @@ interface ModalProps {
 
 function NovédadModal({ novedad, onClose, onAprobar, onRechazar }: ModalProps) {
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200 }}
+    <div className="modal-overlay" style={{ position: 'fixed', inset: 0, background: 'rgba(26,24,20,0.38)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200, padding: 20 }}
       onClick={onClose}>
-      <div style={{ background: '#fff', borderRadius: 12, padding: 24, width: 440, boxShadow: '0 20px 40px rgba(0,0,0,0.15)' }} onClick={e => e.stopPropagation()}>
+      <div className="modal-card" style={{ background: '#fff', borderRadius: 16, padding: 24, width: 440, boxShadow: 'var(--shadow-lg)', border: '1px solid var(--border)' }} onClick={e => e.stopPropagation()}>
         <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 4 }}>{novedad.empleadoNombre}</div>
         <div style={{ fontSize: 13, color: '#6b6b66', marginBottom: 16 }}>
           {tipoLabel[novedad.tipo]} — {novedad.fecha.split('-').reverse().join('/')}
@@ -72,14 +75,24 @@ interface NuevaNovedadModalProps {
 
 function NuevaNovedadModal({ onClose, onSave }: NuevaNovedadModalProps) {
   const [form, setForm] = useState({ empleadoNombre: 'Juan Pérez', empleadoId: 'e1', fecha: '2025-04-18', tipo: 'licencia' as TipoNovedad, detalle: '' })
-  function handleSave() {
-    onSave({ id: `n${Date.now()}`, ...form, origen: 'manual', estado: 'pendiente' })
-    onClose()
+  const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState('')
+  async function handleSave() {
+    setSaving(true)
+    setSaveError('')
+    try {
+      const created = await createNovedad({ ...form, origen: 'manual', estado: 'pendiente' })
+      onSave(created)
+      onClose()
+    } catch (e) {
+      setSaveError(e instanceof Error ? e.message : String(e))
+      setSaving(false)
+    }
   }
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200 }}
+    <div className="modal-overlay" style={{ position: 'fixed', inset: 0, background: 'rgba(26,24,20,0.38)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200, padding: 20 }}
       onClick={onClose}>
-      <div style={{ background: '#fff', borderRadius: 12, padding: 24, width: 440 }} onClick={e => e.stopPropagation()}>
+      <div className="modal-card" style={{ background: '#fff', borderRadius: 16, padding: 24, width: 440, boxShadow: 'var(--shadow-lg)', border: '1px solid var(--border)' }} onClick={e => e.stopPropagation()}>
         <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 16 }}>Nueva novedad</div>
         {[
           { label: 'Empleado', type: 'text', value: form.empleadoNombre, onChange: (v: string) => setForm(f => ({ ...f, empleadoNombre: v })) },
@@ -99,9 +112,12 @@ function NuevaNovedadModal({ onClose, onSave }: NuevaNovedadModalProps) {
             {Object.entries(tipoLabel).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
           </select>
         </div>
+        {saveError && (
+          <div style={{ background: '#fdeaea', border: '1px solid #f6cdcd', color: '#991b1b', borderRadius: 8, padding: '8px 10px', fontSize: 12, marginBottom: 12 }}>{saveError}</div>
+        )}
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-          <Button onClick={onClose}>Cancelar</Button>
-          <Button variant="primary" onClick={handleSave}>Guardar</Button>
+          <Button onClick={onClose} disabled={saving}>Cancelar</Button>
+          <Button variant="primary" onClick={handleSave} disabled={saving}>{saving ? 'Guardando…' : 'Guardar'}</Button>
         </div>
       </div>
     </div>
@@ -114,7 +130,8 @@ interface Props {
 }
 
 export function Novedades({ showNewModal, onCloseNewModal }: Props) {
-  const [data, setData] = useState(initialNovedades)
+  const { data: query, loading, error, reload, setData } = useQuery(fetchNovedades, [])
+  const data = query ?? []
   const [search, setSearch] = useState('')
   const [filterEstado, setFilterEstado] = useState('todos')
   const [filterTipo, setFilterTipo] = useState('todos')
@@ -128,19 +145,21 @@ export function Novedades({ showNewModal, onCloseNewModal }: Props) {
     return matchSearch && matchEstado && matchTipo
   })
 
-  function aprobar(id: string) {
-    setData(prev => prev.map(n => n.id === id ? { ...n, estado: 'aprobada' } : n))
+  async function aprobar(id: string) {
     setSelected(null)
+    await setNovedadEstado(id, 'aprobada')
+    setData(prev => (prev ?? []).map(n => n.id === id ? { ...n, estado: 'aprobada' } : n))
   }
-  function rechazar(id: string) {
-    setData(prev => prev.map(n => n.id === id ? { ...n, estado: 'rechazada' } : n))
+  async function rechazar(id: string) {
     setSelected(null)
+    await setNovedadEstado(id, 'rechazada')
+    setData(prev => (prev ?? []).map(n => n.id === id ? { ...n, estado: 'rechazada' } : n))
   }
 
   const pendientes = data.filter(n => n.estado === 'pendiente').length
 
   return (
-    <div style={{ padding: 24, maxWidth: 1200, margin: '0 auto' }}>
+    <div style={{ padding: '24px 32px' }}>
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 20 }}>
         <div>
           <div style={{ fontSize: 20, fontWeight: 600 }}>Novedades</div>
@@ -149,18 +168,13 @@ export function Novedades({ showNewModal, onCloseNewModal }: Props) {
         <Button variant="primary" onClick={() => setShowNew(true)}>+ Nueva novedad</Button>
       </div>
 
+      {loading ? <Loading /> : error ? <ErrorBox message={error} onRetry={reload} /> : (
+      <>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12, marginBottom: 20 }}>
-        {[
-          { label: 'Total', value: data.length },
-          { label: 'Pendientes', value: pendientes, color: 'warn' as const },
-          { label: 'Aprobadas', value: data.filter(n => n.estado === 'aprobada').length, color: 'success' as const },
-          { label: 'Rechazadas', value: data.filter(n => n.estado === 'rechazada').length, color: 'danger' as const },
-        ].map(m => (
-          <div key={m.label} style={{ background: '#eeece6', borderRadius: 10, padding: '14px 16px' }}>
-            <div style={{ fontSize: 11, color: '#888780', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6, fontWeight: 500 }}>{m.label}</div>
-            <div style={{ fontSize: 26, fontWeight: 600, color: m.color === 'warn' ? '#b45309' : m.color === 'success' ? '#15803d' : m.color === 'danger' ? '#b91c1c' : '#1a1a18' }}>{m.value}</div>
-          </div>
-        ))}
+        <MetricCard label="Total" value={data.length} />
+        <MetricCard label="Pendientes" value={pendientes} valueColor="warn" />
+        <MetricCard label="Aprobadas" value={data.filter(n => n.estado === 'aprobada').length} valueColor="success" />
+        <MetricCard label="Rechazadas" value={data.filter(n => n.estado === 'rechazada').length} valueColor="danger" />
       </div>
 
       <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
@@ -215,6 +229,8 @@ export function Novedades({ showNewModal, onCloseNewModal }: Props) {
           </tbody>
         </table>
       </div>
+      </>
+      )}
 
       {selected && (
         <NovédadModal novedad={selected} onClose={() => setSelected(null)} onAprobar={() => aprobar(selected.id)} onRechazar={() => rechazar(selected.id)} />
@@ -222,7 +238,7 @@ export function Novedades({ showNewModal, onCloseNewModal }: Props) {
       {(showNew || showNewModal) && (
         <NuevaNovedadModal
           onClose={() => { setShowNew(false); onCloseNewModal?.() }}
-          onSave={n => setData(prev => [n, ...prev])}
+          onSave={n => setData(prev => [n, ...(prev ?? [])])}
         />
       )}
     </div>

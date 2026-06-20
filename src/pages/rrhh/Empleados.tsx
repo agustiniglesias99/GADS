@@ -1,7 +1,9 @@
 import { useState } from 'react'
 import { Badge } from '../../components/ui/Badge'
 import { Button } from '../../components/ui/Button'
-import { empleados } from '../../data/mockData'
+import { Loading, ErrorBox } from '../../components/ui/States'
+import { useQuery } from '../../lib/useQuery'
+import { fetchEmpleados } from '../../lib/api'
 import type { BadgeVariant } from '../../types'
 
 const estadoBadge: Record<string, BadgeVariant> = {
@@ -15,6 +17,8 @@ interface Props {
 }
 
 export function Empleados({ onSelectEmpleado }: Props) {
+  const { data, loading, error, reload } = useQuery(fetchEmpleados, [])
+  const empleados = data ?? []
   const [search, setSearch] = useState('')
   const [filterEstado, setFilterEstado] = useState('todos')
 
@@ -25,7 +29,7 @@ export function Empleados({ onSelectEmpleado }: Props) {
   })
 
   return (
-    <div style={{ padding: 24, maxWidth: 1200, margin: '0 auto' }}>
+    <div style={{ padding: '24px 32px' }}>
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 20 }}>
         <div>
           <div style={{ fontSize: 20, fontWeight: 600 }}>Empleados</div>
@@ -47,6 +51,7 @@ export function Empleados({ onSelectEmpleado }: Props) {
       </div>
 
       <div style={{ background: '#fff', border: '1px solid #e2e0d8', borderRadius: 12, padding: 18 }}>
+        {loading ? <Loading /> : error ? <ErrorBox message={error} onRetry={reload} /> : (
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
           <thead>
             <tr>
@@ -82,6 +87,7 @@ export function Empleados({ onSelectEmpleado }: Props) {
             ))}
           </tbody>
         </table>
+        )}
       </div>
     </div>
   )

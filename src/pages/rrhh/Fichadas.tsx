@@ -2,7 +2,9 @@ import { useState } from 'react'
 import { MetricCard } from '../../components/ui/MetricCard'
 import { Badge } from '../../components/ui/Badge'
 import { Button } from '../../components/ui/Button'
-import { registrosDia, empleados } from '../../data/mockData'
+import { Loading, ErrorBox } from '../../components/ui/States'
+import { useQuery } from '../../lib/useQuery'
+import { fetchRegistros, fetchEmpleados } from '../../lib/api'
 import type { BadgeVariant, RegistroDia } from '../../types'
 
 const estadoBadge: Record<string, BadgeVariant> = {
@@ -40,6 +42,13 @@ const origenLabel: Record<string, string> = {
 }
 
 export function Fichadas() {
+  const { data, loading, error, reload } = useQuery(async () => {
+    const [registros, empleados] = await Promise.all([fetchRegistros(), fetchEmpleados()])
+    return { registros, empleados }
+  }, [])
+  const registrosDia = data?.registros ?? []
+  const empleados = data?.empleados ?? []
+
   const [selectedDate, setSelectedDate] = useState('2025-04-14')
   const [searchTerm, setSearchTerm] = useState('')
   const [filterEstado, setFilterEstado] = useState('todos')
@@ -71,7 +80,7 @@ export function Fichadas() {
   const totalFichadas = registros.length
 
   return (
-    <div style={{ padding: 24, maxWidth: 1200, margin: '0 auto' }}>
+    <div style={{ padding: '24px 32px' }}>
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 20 }}>
         <div>
           <div style={{ fontSize: 20, fontWeight: 600 }}>Fichadas del día</div>
@@ -86,6 +95,8 @@ export function Fichadas() {
         </div>
       </div>
 
+      {loading ? <Loading /> : error ? <ErrorBox message={error} onRetry={reload} /> : (
+      <>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 10, marginBottom: 16 }}>
         <MetricCard label="Presentes" value={presentes} valueColor="success" />
         <MetricCard label="Ausentes" value={ausentes} valueColor="danger" />
@@ -199,11 +210,13 @@ export function Fichadas() {
           </div>
         </div>
       </div>
+      </>
+      )}
 
       {modalOpen && selectedEmpleado && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200 }}
+        <div className="modal-overlay" style={{ position: 'fixed', inset: 0, background: 'rgba(26,24,20,0.38)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200, padding: 20 }}
           onClick={() => setModalOpen(false)}>
-          <div style={{ background: '#fff', borderRadius: 12, padding: 24, width: 400, boxShadow: '0 20px 40px rgba(0,0,0,0.15)' }} onClick={e => e.stopPropagation()}>
+          <div className="modal-card" style={{ background: '#fff', borderRadius: 16, padding: 24, width: 400, boxShadow: 'var(--shadow-lg)', border: '1px solid var(--border)' }} onClick={e => e.stopPropagation()}>
             <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 4 }}>{empleados.find(e => e.id === selectedEmpleado.empleadoId)?.nombre}</div>
             <div style={{ fontSize: 13, color: '#6b6b66', marginBottom: 16 }}>{selectedDate} — <Badge variant={estadoBadge[selectedEmpleado.estado]}>{estadoLabel[selectedEmpleado.estado]}</Badge></div>
             <div style={{ fontSize: 13, display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 20 }}>

@@ -15,14 +15,23 @@ type Page =
   | 'dashboard' | 'fichadas' | 'empleados' | 'novedades' | 'cierre'
   | 'mi-panel' | 'exportar'
 
+function FullScreen({ children }: { children: React.ReactNode }) {
+  return (
+    <div style={{ minHeight: '100svh', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#6b6b66', fontSize: 14 }}>
+      {children}
+    </div>
+  )
+}
+
 function AppContent() {
-  const { user } = useAuth()
+  const { user, loading } = useAuth()
   const [currentPage, setCurrentPage] = useState<Page>(() => {
     return 'dashboard'
   })
   const [selectedEmpleadoId, setSelectedEmpleadoId] = useState<string | null>(null)
   const [showNewNovedad, setShowNewNovedad] = useState(false)
 
+  if (loading) return <FullScreen><span style={{ animation: 'pageIn 0.4s var(--ease) both' }}>Cargando…</span></FullScreen>
   if (!user) return <Login />
 
   function navigate(page: Page) {
@@ -52,7 +61,7 @@ function AppContent() {
   const page = user.role === 'rrhh' ? currentPage : user.role === 'empleado' ? 'mi-panel' : 'exportar'
 
   return (
-    <div style={{ minHeight: '100svh', background: '#f5f5f0' }}>
+    <div style={{ minHeight: '100svh' }}>
       <Topbar
         currentPage={page as Page}
         onNavigate={p => {

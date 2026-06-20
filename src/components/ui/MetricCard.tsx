@@ -8,6 +8,14 @@ const colors: Record<ValueColor, string> = {
   info: '#1d4ed8',
 }
 
+const accents: Record<ValueColor, string> = {
+  default: '#cfccc2',
+  success: '#22c55e',
+  warn: '#f59e0b',
+  danger: '#ef4444',
+  info: '#3b82f6',
+}
+
 interface MetricCardProps {
   label: string
   value: string | number
@@ -17,10 +25,17 @@ interface MetricCardProps {
 
 export function MetricCard({ label, value, sub, valueColor = 'default' }: MetricCardProps) {
   return (
-    <div style={{ background: '#eeece6', borderRadius: 10, padding: '14px 16px' }}>
-      <div style={{ fontSize: 11, color: '#888780', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6, fontWeight: 500 }}>{label}</div>
-      <div style={{ fontSize: 26, fontWeight: 600, lineHeight: 1, color: colors[valueColor] }}>{value}</div>
-      {sub && <div style={{ fontSize: 12, color: '#6b6b66', marginTop: 5 }}>{sub}</div>}
+    <div className="metric" style={{
+      background: 'var(--surface)',
+      border: '1px solid var(--border)',
+      borderRadius: 12,
+      padding: '15px 16px 15px 18px',
+      boxShadow: 'var(--shadow-xs)',
+    }}>
+      <span style={{ position: 'absolute', left: 0, top: 12, bottom: 12, width: 3, borderRadius: 3, background: accents[valueColor] }} />
+      <div style={{ fontSize: 11, color: '#8f8d84', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8, fontWeight: 600 }}>{label}</div>
+      <div style={{ fontSize: 27, fontWeight: 700, lineHeight: 1, letterSpacing: '-0.02em', color: colors[valueColor] }}>{value}</div>
+      {sub && <div style={{ fontSize: 12, color: '#6b6b66', marginTop: 6 }}>{sub}</div>}
     </div>
   )
 }

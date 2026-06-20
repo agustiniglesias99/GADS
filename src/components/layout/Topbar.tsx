@@ -38,28 +38,42 @@ export function Topbar({ currentPage, onNavigate, onNewNovedad }: TopbarProps) {
 
   const initials = user?.nombre?.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase() ?? 'US'
 
+  const roleLabel = user?.role === 'rrhh' ? 'RRHH' : user?.role === 'empleado' ? 'Empleado' : 'Contador'
+
   return (
     <div style={{
       display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-      padding: '12px 24px', borderBottom: '1px solid #e2e0d8', background: '#fff',
+      padding: '11px 24px', borderBottom: '1px solid var(--border)',
+      background: 'rgba(255,255,255,0.82)',
+      backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)',
       position: 'sticky', top: 0, zIndex: 100,
+      boxShadow: '0 1px 0 rgba(30,28,22,0.02)',
     }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-        <span style={{ fontSize: 15, fontWeight: 600, color: '#1a1a18', marginRight: 8 }}>ARCADE</span>
-        <nav style={{ display: 'flex', gap: 4 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 18 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+          <span style={{
+            width: 26, height: 26, borderRadius: 8, flexShrink: 0,
+            background: 'linear-gradient(135deg, #2a2a26 0%, #000 100%)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            color: '#fff', fontSize: 14, fontWeight: 800,
+            boxShadow: '0 2px 6px rgba(0,0,0,0.18)',
+          }}>A</span>
+          <span style={{ fontSize: 15, fontWeight: 700, color: '#1a1a18', letterSpacing: '-0.01em' }}>ARCADE</span>
+        </div>
+        <div style={{ width: 1, height: 20, background: 'var(--border)' }} />
+        <nav style={{ display: 'flex', gap: 2 }}>
           {navItems.map(item => (
             <button
               key={item.id}
+              className="nav-btn"
               onClick={() => onNavigate(item.id)}
               style={{
                 fontSize: 13,
-                padding: '6px 12px',
+                padding: '7px 12px',
                 borderRadius: 8,
-                border: 'none',
-                background: currentPage === item.id ? '#eeece6' : 'transparent',
+                background: currentPage === item.id ? 'var(--surface-sunk)' : 'transparent',
                 color: currentPage === item.id ? '#1a1a18' : '#6b6b66',
-                fontWeight: currentPage === item.id ? 500 : 400,
-                cursor: 'pointer',
+                fontWeight: currentPage === item.id ? 600 : 500,
               }}
             >
               {item.label}
@@ -67,22 +81,31 @@ export function Topbar({ currentPage, onNavigate, onNewNovedad }: TopbarProps) {
           ))}
         </nav>
       </div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
         {user?.role === 'rrhh' && onNewNovedad && (
           <Button variant="primary" onClick={onNewNovedad}>+ Nueva novedad</Button>
         )}
-        <div title={user?.nombre} style={{
-          width: 32, height: 32, borderRadius: '50%', background: '#dbeafe',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: 12, fontWeight: 600, color: '#1d4ed8', cursor: 'pointer',
-        }}>
-          {initials}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+          <div title={user?.nombre} style={{
+            width: 32, height: 32, borderRadius: '50%',
+            background: 'linear-gradient(135deg, #6366f1 0%, #4338ca 100%)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 12, fontWeight: 700, color: '#fff', cursor: 'default',
+            boxShadow: '0 2px 6px rgba(67,56,202,0.28)',
+          }}>
+            {initials}
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.2 }}>
+            <span style={{ fontSize: 12.5, fontWeight: 600, color: '#1a1a18' }}>{user?.nombre}</span>
+            <span style={{ fontSize: 11, color: '#8f8d84' }}>{roleLabel}</span>
+          </div>
         </div>
         <button
           onClick={logout}
+          className="icon-btn"
           style={{
-            fontSize: 12, padding: '5px 10px', borderRadius: 8, border: '1px solid #d4d2ca',
-            background: '#fff', color: '#6b6b66', cursor: 'pointer',
+            fontSize: 12, fontWeight: 500, padding: '6px 12px', borderRadius: 8,
+            border: '1px solid var(--border-strong)', background: '#fff', color: '#6b6b66',
           }}
         >
           Salir
