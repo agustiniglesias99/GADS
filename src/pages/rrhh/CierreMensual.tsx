@@ -5,6 +5,44 @@ import { Button } from '../../components/ui/Button'
 import { Loading, ErrorBox } from '../../components/ui/States'
 import { useQuery } from '../../lib/useQuery'
 import { fetchCierres, fetchResumen, fetchNovedades } from '../../lib/api'
+import type { ResumenEmpleado } from '../../types'
+
+const fmtMin = (m: number) => (m ? `${Math.floor(m / 60)}h ${m % 60}m` : '—')
+
+function ResumenModal({ resumen, onClose }: { resumen: ResumenEmpleado; onClose: () => void }) {
+  const filas: [string, string | number][] = [
+    ['Legajo', resumen.legajo],
+    ['DNI', resumen.dni],
+    ['CUIL', resumen.cuil],
+    ['Días trabajados', resumen.diasTrabajados],
+    ['Ausencias justificadas', resumen.ausenciasJustificadas],
+    ['Ausencias injustificadas', resumen.ausenciasInjustificadas],
+    ['Tardanzas', resumen.tardanzasMin ? `${resumen.tardanzasMin} min` : '—'],
+    ['Horas extra 50%', fmtMin(resumen.horasExtra50)],
+    ['Horas extra 100%', fmtMin(resumen.horasExtra100)],
+    ['Licencias', resumen.licencias],
+    ['Vacaciones', resumen.vacaciones],
+    ['Estado', resumen.estado === 'listo' ? 'Listo' : 'Pendiente'],
+  ]
+  return (
+    <div className="modal-overlay" style={{ position: 'fixed', inset: 0, background: 'rgba(26,24,20,0.38)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200, padding: 20 }}
+      onClick={onClose}>
+      <div className="modal-card" style={{ background: '#fff', borderRadius: 16, padding: 24, width: 440, boxShadow: 'var(--shadow-lg)', border: '1px solid var(--border)' }} onClick={e => e.stopPropagation()}>
+        <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 4 }}>{resumen.nombre}</div>
+        <div style={{ fontSize: 13, color: '#6b6b66', marginBottom: 16 }}>Desglose de preliquidación</div>
+        {filas.map(([l, v]) => (
+          <div key={l} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', fontSize: 13, borderBottom: '1px solid #f0ede6' }}>
+            <span style={{ color: '#6b6b66' }}>{l}</span>
+            <span style={{ fontWeight: 500 }}>{v}</span>
+          </div>
+        ))}
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 20 }}>
+          <Button onClick={onClose}>Cerrar</Button>
+        </div>
+      </div>
+    </div>
+  )
+}
 
 export function CierreMensual() {
   const { data, loading, error, reload } = useQuery(async () => {
@@ -14,6 +52,7 @@ export function CierreMensual() {
     return { cierres, resumen, novedades }
   }, [])
   const [periodo, setPeriodo] = useState('Abril 2025')
+  const [selectedResumen, setSelectedResumen] = useState<ResumenEmpleado | null>(null)
 
   if (loading) return <div style={{ padding: '24px 32px' }}><Loading /></div>
   if (error) return <div style={{ padding: '24px 32px' }}><ErrorBox message={error} onRetry={reload} /></div>
@@ -112,7 +151,7 @@ export function CierreMensual() {
                       <Badge variant={r.estado === 'listo' ? 'success' : 'warn'}>{r.estado === 'listo' ? 'Listo' : 'Pendiente'}</Badge>
                     </td>
                     <td style={{ padding: '8px 0', borderBottom: '1px solid #f0ede6' }}>
-                      <Button variant="sm">Ver</Button>
+                      <Button variant="sm" onClick={() => setSelectedResumen(r)}>Ver</Button>
                     </td>
                   </tr>
                 ))}
@@ -189,6 +228,10 @@ export function CierreMensual() {
           </div>
         </div>
       </div>
+
+      {selectedResumen && (
+        <ResumenModal resumen={selectedResumen} onClose={() => setSelectedResumen(null)} />
+      )}
     </div>
   )
 }

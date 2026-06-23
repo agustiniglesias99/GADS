@@ -7,17 +7,18 @@
 --  with role 'empleado' by default. This script fixes the roles.
 -- ============================================================
 
--- Staff accounts (adjust emails to whatever you created):
-update public.profiles set role = 'rrhh'     where email = 'rrhh@arcade.com';
-update public.profiles set role = 'contador' where email = 'contador@arcade.com';
+-- Sanity check: confirm a profile row exists for each new auth user.
+-- (If a user is missing here, the on_auth_user_created trigger didn't
+--  fire — insert it manually using their UUID from Authentication → Users.)
+-- select id, email, role, empleado_id from public.profiles order by created_at desc;
 
--- Employees: link any auth user whose email matches an empleado row,
--- and point their profile at that empleado.
-update public.profiles p
-set role = 'empleado',
-    empleado_id = e.id
-from public.empleados e
-where p.email = e.email;
+-- RRHH / admin account:
+update public.profiles set role = 'rrhh'
+where email = 'rrhh@arcade.com';
+
+-- Employee account → link it to Juan Pérez (empleado e1):
+update public.profiles set role = 'empleado', empleado_id = 'e1'
+where email = 'agustiniglesias99@gmail.com';
 
 -- Check the result:
 -- select email, role, empleado_id from public.profiles order by role;

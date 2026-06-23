@@ -159,8 +159,8 @@ export function Novedades({ showNewModal, onCloseNewModal }: Props) {
   const pendientes = data.filter(n => n.estado === 'pendiente').length
 
   return (
-    <div style={{ padding: '24px 32px' }}>
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 20 }}>
+    <div style={{ padding: '24px 32px', height: '100%', display: 'flex', flexDirection: 'column', boxSizing: 'border-box' }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 20, flexShrink: 0 }}>
         <div>
           <div style={{ fontSize: 20, fontWeight: 600 }}>Novedades</div>
           <div style={{ fontSize: 13, color: '#6b6b66', marginTop: 2 }}>{pendientes} pendientes de aprobación</div>
@@ -170,14 +170,14 @@ export function Novedades({ showNewModal, onCloseNewModal }: Props) {
 
       {loading ? <Loading /> : error ? <ErrorBox message={error} onRetry={reload} /> : (
       <>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12, marginBottom: 20 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12, marginBottom: 20, flexShrink: 0 }}>
         <MetricCard label="Total" value={data.length} />
         <MetricCard label="Pendientes" value={pendientes} valueColor="warn" />
         <MetricCard label="Aprobadas" value={data.filter(n => n.estado === 'aprobada').length} valueColor="success" />
         <MetricCard label="Rechazadas" value={data.filter(n => n.estado === 'rechazada').length} valueColor="danger" />
       </div>
 
-      <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 14, flexShrink: 0 }}>
         <input type="text" placeholder="Buscar empleado..." value={search} onChange={e => setSearch(e.target.value)}
           style={{ fontSize: 13, padding: '6px 10px', borderRadius: 8, border: '1px solid #d4d2ca', width: 200 }} />
         <select value={filterEstado} onChange={e => setFilterEstado(e.target.value)}
@@ -195,12 +195,12 @@ export function Novedades({ showNewModal, onCloseNewModal }: Props) {
         </select>
       </div>
 
-      <div style={{ background: '#fff', border: '1px solid #e2e0d8', borderRadius: 12, padding: 18 }}>
+      <div style={{ background: '#fff', border: '1px solid #e2e0d8', borderRadius: 12, padding: '0 18px 18px', flex: 1, minHeight: 0, overflowY: 'auto' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
           <thead>
             <tr>
               {['Empleado', 'Fecha', 'Tipo', 'Detalle', 'Origen', 'Estado', ''].map(h => (
-                <th key={h} style={{ textAlign: 'left', fontWeight: 600, fontSize: 11, color: '#888780', textTransform: 'uppercase', letterSpacing: '0.04em', paddingBottom: 8, borderBottom: '1px solid #e2e0d8', paddingRight: 10 }}>{h}</th>
+                <th key={h} style={{ textAlign: 'left', fontWeight: 600, fontSize: 11, color: '#888780', textTransform: 'uppercase', letterSpacing: '0.04em', paddingTop: 18, paddingBottom: 8, borderBottom: '1px solid #e2e0d8', paddingRight: 10, position: 'sticky', top: 0, background: '#fff', zIndex: 1 }}>{h}</th>
               ))}
             </tr>
           </thead>

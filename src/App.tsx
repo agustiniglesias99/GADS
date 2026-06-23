@@ -61,7 +61,7 @@ function AppContent() {
   const page = user.role === 'rrhh' ? currentPage : user.role === 'empleado' ? 'mi-panel' : 'exportar'
 
   return (
-    <div style={{ minHeight: '100svh' }}>
+    <div style={{ height: '100svh', display: 'flex', flexDirection: 'column' }}>
       <Topbar
         currentPage={page as Page}
         onNavigate={p => {
@@ -75,7 +75,7 @@ function AppContent() {
           setShowNewNovedad(true)
         }}
       />
-      <main>{renderPage()}</main>
+      <main style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>{renderPage()}</main>
     </div>
   )
 }
