@@ -13,7 +13,7 @@ type EstadoEmpleado = 'activo' | 'suspendido' | 'inactivo'
 type TipoNovedad =
   | 'tardanza' | 'ausencia_injustificada' | 'ausencia_justificada'
   | 'hora_extra_50' | 'hora_extra_100' | 'licencia' | 'vacaciones'
-  | 'salida_anticipada' | 'sin_descanso' | 'anomalia'
+  | 'salida_anticipada' | 'sin_descanso'
 type OrigenNovedad = 'automatica' | 'manual'
 type EstadoNovedad = 'pendiente' | 'aprobada' | 'rechazada' | 'justificada'
 type OrigenFichada = 'biometrico' | 'qr' | 'manual' | 'api'

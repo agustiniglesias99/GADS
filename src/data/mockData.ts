@@ -17,7 +17,6 @@ export const novedades: Novedad[] = [
   { id: 'n3', empleadoId: 'e1', empleadoNombre: 'Juan Pérez', fecha: '2025-04-15', tipo: 'ausencia_injustificada', detalle: 'Día completo', origen: 'automatica', estado: 'pendiente' },
   { id: 'n4', empleadoId: 'e1', empleadoNombre: 'Juan Pérez', fecha: '2025-04-18', tipo: 'hora_extra_50', detalle: '255 min', origen: 'automatica', estado: 'aprobada' },
   { id: 'n5', empleadoId: 'e1', empleadoNombre: 'Juan Pérez', fecha: '2025-04-22', tipo: 'ausencia_justificada', detalle: 'Turno médico', origen: 'manual', estado: 'aprobada' },
-  { id: 'n6', empleadoId: 'e2', empleadoNombre: 'Ana Martínez', fecha: '2025-04-14', tipo: 'anomalia', detalle: 'Doble fichada', origen: 'automatica', estado: 'pendiente' },
   { id: 'n7', empleadoId: 'e2', empleadoNombre: 'Ana Martínez', fecha: '2025-04-10', tipo: 'tardanza', detalle: '12 min', origen: 'automatica', estado: 'aprobada' },
   { id: 'n8', empleadoId: 'e3', empleadoNombre: 'Carlos López', fecha: '2025-04-13', tipo: 'hora_extra_50', detalle: '135 min', origen: 'automatica', estado: 'aprobada' },
   { id: 'n9', empleadoId: 'e3', empleadoNombre: 'Carlos López', fecha: '2025-04-11', tipo: 'hora_extra_100', detalle: '180 min', origen: 'automatica', estado: 'aprobada' },

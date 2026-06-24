@@ -27,7 +27,6 @@ values
   ('n3','e1','Juan Pérez','2025-04-15','ausencia_injustificada','Día completo','automatica','pendiente'),
   ('n4','e1','Juan Pérez','2025-04-18','hora_extra_50','255 min','automatica','aprobada'),
   ('n5','e1','Juan Pérez','2025-04-22','ausencia_justificada','Turno médico','manual','aprobada'),
-  ('n6','e2','Ana Martínez','2025-04-14','anomalia','Doble fichada','automatica','pendiente'),
   ('n7','e2','Ana Martínez','2025-04-10','tardanza','12 min','automatica','aprobada'),
   ('n8','e3','Carlos López','2025-04-13','hora_extra_50','135 min','automatica','aprobada'),
   ('n9','e3','Carlos López','2025-04-11','hora_extra_100','180 min','automatica','aprobada'),

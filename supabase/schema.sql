@@ -28,7 +28,7 @@ create type public.estado_empleado as enum ('activo', 'suspendido', 'inactivo');
 create type public.tipo_novedad    as enum (
   'tardanza', 'ausencia_injustificada', 'ausencia_justificada',
   'hora_extra_50', 'hora_extra_100', 'licencia', 'vacaciones',
-  'salida_anticipada', 'sin_descanso', 'anomalia'
+  'salida_anticipada', 'sin_descanso'
 );
 create type public.origen_novedad  as enum ('automatica', 'manual');
 create type public.estado_novedad  as enum ('pendiente', 'aprobada', 'rechazada', 'justificada');

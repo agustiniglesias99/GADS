@@ -17,7 +17,6 @@ const tipoLabel: Record<TipoNovedad, string> = {
   vacaciones: 'Vacaciones',
   salida_anticipada: 'Salida anticipada',
   sin_descanso: 'Sin descanso',
-  anomalia: 'Anomalía',
 }
 
 const estadoBadge: Record<EstadoNovedad, BadgeVariant> = {

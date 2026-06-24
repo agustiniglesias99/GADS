@@ -14,7 +14,6 @@ export type TipoNovedad =
   | 'vacaciones'
   | 'salida_anticipada'
   | 'sin_descanso'
-  | 'anomalia'
 
 export type OrigenFichada = 'biometrico' | 'qr' | 'manual' | 'api'
 export type TipoFichada = 'entrada' | 'salida' | 'descanso_inicio' | 'descanso_fin'

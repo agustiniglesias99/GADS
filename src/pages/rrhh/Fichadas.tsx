@@ -49,7 +49,10 @@ export function Fichadas() {
   const registrosDia = data?.registros ?? []
   const empleados = data?.empleados ?? []
 
-  const [selectedDate, setSelectedDate] = useState('2025-04-14')
+  const [selectedDate, setSelectedDate] = useState(() => {
+    const d = new Date()
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  })
   const [searchTerm, setSearchTerm] = useState('')
   const [filterEstado, setFilterEstado] = useState('todos')
   const [selectedEmpleado, setSelectedEmpleado] = useState<RegistroDia | null>(null)
