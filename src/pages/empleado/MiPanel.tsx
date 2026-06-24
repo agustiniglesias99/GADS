@@ -1,12 +1,16 @@
-import { useState } from 'react'
+import { useState, lazy, Suspense } from 'react'
 import { MetricCard } from '../../components/ui/MetricCard'
 import { Badge } from '../../components/ui/Badge'
 import { Button } from '../../components/ui/Button'
 import { Loading, ErrorBox } from '../../components/ui/States'
+
+// Carga diferida: html5-qrcode es pesado y solo se necesita al fichar.
+const QRScanner = lazy(() => import('../../components/ui/QRScanner').then(m => ({ default: m.QRScanner })))
 import { useQuery } from '../../lib/useQuery'
-import { fetchEmpleado, fetchNovedadesByEmpleado, createNovedad } from '../../lib/api'
+import { fetchEmpleado, fetchNovedadesByEmpleado, createNovedad, fetchRegistroDia, registrarFichada, type FichadaResult } from '../../lib/api'
+import { QR_CHECKIN_TOKEN, fechaHoy } from '../../lib/asistencia'
 import { useAuth } from '../../context/AuthContext'
-import type { BadgeVariant, EstadoNovedad, TipoNovedad, Novedad } from '../../types'
+import type { BadgeVariant, EstadoNovedad, TipoNovedad, Novedad, Empleado, RegistroDia } from '../../types'
 
 const tipoLabel: Record<TipoNovedad, string> = {
   tardanza: 'Tardanza',
@@ -25,6 +29,15 @@ const estadoBadge: Record<EstadoNovedad, BadgeVariant> = {
   aprobada: 'success',
   rechazada: 'danger',
   justificada: 'info',
+}
+
+const registroEstadoBadge: Record<string, BadgeVariant> = {
+  presente: 'success', tardanza: 'warn', hora_extra: 'info',
+  salida_anticipada: 'warn', sin_descanso: 'warn', ausente: 'danger', anomalia: 'danger',
+}
+const registroEstadoLabel: Record<string, string> = {
+  presente: 'Presente', tardanza: 'Tardanza', hora_extra: 'Hora extra',
+  salida_anticipada: 'Salida anticipada', sin_descanso: 'Sin descanso', ausente: 'Ausente', anomalia: 'Anomalía',
 }
 
 type DayType = 'ok' | 'warn' | 'danger' | 'info' | 'gray' | 'empty'
@@ -116,23 +129,111 @@ function SolicitudModal({ onClose, onSave }: { onClose: () => void; onSave: (n: 
   )
 }
 
+function FichajeModal({ emp, fecha, onClose, onDone }: {
+  emp: Empleado
+  fecha: string
+  onClose: () => void
+  onDone: (r: RegistroDia) => void
+}) {
+  const [scanning, setScanning] = useState(true)
+  const [manual, setManual] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+  const [result, setResult] = useState<FichadaResult | null>(null)
+
+  async function procesar(text: string) {
+    setScanning(false)
+    if (text.trim() !== QR_CHECKIN_TOKEN) {
+      setError('QR inválido. Escaneá el código del punto de fichaje.')
+      return
+    }
+    setSaving(true)
+    setError('')
+    try {
+      const res = await registrarFichada(emp, fecha)
+      setResult(res)
+      onDone(res.registro)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  function reintentar() {
+    setError('')
+    setManual('')
+    setScanning(true)
+  }
+
+  return (
+    <div className="modal-overlay" style={{ position: 'fixed', inset: 0, background: 'rgba(26,24,20,0.38)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200, padding: 20 }}
+      onClick={onClose}>
+      <div className="modal-card" style={{ background: '#fff', borderRadius: 16, padding: 24, width: 380, boxShadow: 'var(--shadow-lg)', border: '1px solid var(--border)' }} onClick={e => e.stopPropagation()}>
+        <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 4 }}>Fichar asistencia</div>
+        <div style={{ fontSize: 12, color: '#6b6b66', marginBottom: 16 }}>Escaneá el QR del punto de fichaje</div>
+
+        {result ? (
+          <div style={{ textAlign: 'center', padding: '8px 0 16px' }}>
+            <div style={{ fontSize: 40, marginBottom: 8 }}>✅</div>
+            <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 4 }}>
+              {result.accion === 'ingreso' ? 'Ingreso registrado' : 'Egreso registrado'}
+            </div>
+            <div style={{ fontSize: 13, color: '#6b6b66', marginBottom: 10 }}>a las {result.hora} hs</div>
+            <Badge variant={registroEstadoBadge[result.registro.estado] ?? 'gray'}>
+              {registroEstadoLabel[result.registro.estado] ?? result.registro.estado}
+            </Badge>
+          </div>
+        ) : saving ? (
+          <div style={{ textAlign: 'center', padding: '24px 0', fontSize: 13, color: '#6b6b66' }}>Registrando…</div>
+        ) : error ? (
+          <div style={{ padding: '4px 0 8px' }}>
+            <div style={{ background: '#fdeaea', border: '1px solid #f6cdcd', color: '#991b1b', borderRadius: 8, padding: '10px 12px', fontSize: 13, marginBottom: 14 }}>{error}</div>
+            <Button variant="primary" onClick={reintentar} style={{ width: '100%' }}>Reintentar</Button>
+          </div>
+        ) : scanning ? (
+          <>
+            <Suspense fallback={<div style={{ textAlign: 'center', padding: '24px 0', fontSize: 13, color: '#6b6b66' }}>Cargando cámara…</div>}>
+              <QRScanner onScan={procesar} onError={msg => { setScanning(false); setError(msg) }} />
+            </Suspense>
+            <div style={{ fontSize: 12, color: '#888780', textAlign: 'center', margin: '12px 0 6px' }}>¿Sin cámara? Ingresá el código del QR</div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <input type="text" value={manual} onChange={e => setManual(e.target.value)} placeholder={QR_CHECKIN_TOKEN}
+                style={{ flex: 1, fontSize: 13, padding: '7px 10px', borderRadius: 8, border: '1px solid #d4d2ca' }} />
+              <Button onClick={() => procesar(manual)} disabled={!manual.trim()}>Usar</Button>
+            </div>
+          </>
+        ) : null}
+
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 18 }}>
+          <Button onClick={onClose}>{result ? 'Listo' : 'Cancelar'}</Button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export function MiPanel() {
   const { user } = useAuth()
   const empleadoId = user?.empleadoId
+  const hoy = fechaHoy()
   const { data, loading, error, reload, setData } = useQuery(async () => {
-    if (!empleadoId) return { emp: null, novedades: [] }
-    const [emp, novedades] = await Promise.all([
-      fetchEmpleado(empleadoId), fetchNovedadesByEmpleado(empleadoId),
+    if (!empleadoId) return { emp: null, novedades: [], registro: null }
+    const [emp, novedades, registro] = await Promise.all([
+      fetchEmpleado(empleadoId), fetchNovedadesByEmpleado(empleadoId), fetchRegistroDia(empleadoId, hoy),
     ])
-    return { emp, novedades }
+    return { emp, novedades, registro }
   }, [empleadoId])
   const [showModal, setShowModal] = useState(false)
+  const [showFichaje, setShowFichaje] = useState(false)
 
   if (loading) return <div style={{ padding: '24px 32px' }}><Loading /></div>
   if (error) return <div style={{ padding: '24px 32px' }}><ErrorBox message={error} onRetry={reload} /></div>
 
   const emp = data?.emp ?? null
   const misNovedades = data?.novedades ?? []
+  const registro = data?.registro ?? null
+  const jornadaCompleta = !!(registro?.entrada && registro?.salida)
   const pendientes = misNovedades.filter(n => n.estado === 'pendiente').length
 
   if (!emp) return <div style={{ padding: '24px 32px', color: '#8f8d84', fontSize: 14 }}>No se encontró tu legajo asociado. Avisá a RRHH.</div>
@@ -166,6 +267,33 @@ export function MiPanel() {
               </div>
             ))}
           </div>
+          <div style={{ background: '#fff', border: '1px solid #e2e0d8', borderRadius: 12, padding: 18, marginBottom: 12 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+              <div style={{ fontSize: 14, fontWeight: 600 }}>Mi fichada de hoy</div>
+              <span style={{ fontSize: 12, color: '#888780' }}>{hoy.split('-').reverse().join('/')}</span>
+            </div>
+            {[
+              ['Entrada', registro?.entrada],
+              ['Salida', registro?.salida],
+            ].map(([l, v]) => (
+              <div key={l} style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0', fontSize: 13 }}>
+                <span style={{ color: '#6b6b66' }}>{l}</span>
+                <span style={{ fontWeight: 500 }}>{v ?? <span style={{ color: '#bbb' }}>—</span>}</span>
+              </div>
+            ))}
+            {registro && (
+              <div style={{ marginTop: 8 }}>
+                <Badge variant={registroEstadoBadge[registro.estado] ?? 'gray'}>
+                  {registroEstadoLabel[registro.estado] ?? registro.estado}
+                </Badge>
+              </div>
+            )}
+            <Button variant="primary" onClick={() => setShowFichaje(true)} disabled={jornadaCompleta}
+              style={{ width: '100%', padding: '9px 14px', marginTop: 14 }}>
+              {jornadaCompleta ? 'Jornada completa' : registro?.entrada ? 'Fichar egreso (QR)' : 'Fichar ingreso (QR)'}
+            </Button>
+          </div>
+
           <Button variant="primary" onClick={() => setShowModal(true)} style={{ width: '100%', padding: '9px 14px' }}>
             + Solicitar licencia / vacaciones
           </Button>
@@ -245,6 +373,14 @@ export function MiPanel() {
         <SolicitudModal
           onClose={() => setShowModal(false)}
           onSave={n => { setData(d => ({ ...d!, novedades: [n, ...(d?.novedades ?? [])] })); setShowModal(false) }}
+        />
+      )}
+      {showFichaje && emp && (
+        <FichajeModal
+          emp={emp}
+          fecha={hoy}
+          onClose={() => setShowFichaje(false)}
+          onDone={r => setData(d => ({ ...d!, registro: r }))}
         />
       )}
     </div>

@@ -223,6 +223,22 @@ create policy "registros: contador read" on public.registros_dia
   for select using (public.current_app_role() = 'contador');
 create policy "registros: empleado reads own" on public.registros_dia
   for select using (public.current_app_role() = 'empleado' and empleado_id = public.current_empleado_id());
+-- El empleado puede fichar su propia asistencia (ingreso/egreso por QR).
+create policy "registros: empleado ficha own" on public.registros_dia
+  for insert with check (
+    public.current_app_role() = 'empleado'
+    and empleado_id = public.current_empleado_id()
+    and origen = 'qr'
+  );
+create policy "registros: empleado actualiza own" on public.registros_dia
+  for update using (
+    public.current_app_role() = 'empleado'
+    and empleado_id = public.current_empleado_id()
+  ) with check (
+    public.current_app_role() = 'empleado'
+    and empleado_id = public.current_empleado_id()
+    and origen = 'qr'
+  );
 
 -- ---- cierres_mensuales -------------------------------------
 create policy "cierres: rrhh full" on public.cierres_mensuales

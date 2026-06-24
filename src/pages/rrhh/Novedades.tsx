@@ -4,7 +4,8 @@ import { Button } from '../../components/ui/Button'
 import { MetricCard } from '../../components/ui/MetricCard'
 import { Loading, ErrorBox } from '../../components/ui/States'
 import { useQuery } from '../../lib/useQuery'
-import { fetchNovedades, setNovedadEstado, createNovedad } from '../../lib/api'
+import { fetchNovedades, setNovedadEstado, createNovedad, fetchEmpleados } from '../../lib/api'
+import { fechaHoy } from '../../lib/asistencia'
 import type { BadgeVariant, EstadoNovedad, TipoNovedad, Novedad } from '../../types'
 
 const tipoLabel: Record<TipoNovedad, string> = {
@@ -73,10 +74,13 @@ interface NuevaNovedadModalProps {
 }
 
 function NuevaNovedadModal({ onClose, onSave }: NuevaNovedadModalProps) {
-  const [form, setForm] = useState({ empleadoNombre: 'Juan Pérez', empleadoId: 'e1', fecha: '2025-04-18', tipo: 'licencia' as TipoNovedad, detalle: '' })
+  const { data: empleados } = useQuery(fetchEmpleados, [])
+  const lista = empleados ?? []
+  const [form, setForm] = useState({ empleadoNombre: '', empleadoId: '', fecha: fechaHoy(), tipo: 'licencia' as TipoNovedad, detalle: '' })
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState('')
   async function handleSave() {
+    if (!form.empleadoId) return
     setSaving(true)
     setSaveError('')
     try {
@@ -93,8 +97,19 @@ function NuevaNovedadModal({ onClose, onSave }: NuevaNovedadModalProps) {
       onClick={onClose}>
       <div className="modal-card" style={{ background: '#fff', borderRadius: 16, padding: 24, width: 440, boxShadow: 'var(--shadow-lg)', border: '1px solid var(--border)' }} onClick={e => e.stopPropagation()}>
         <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 16 }}>Nueva novedad</div>
+        <div style={{ marginBottom: 12 }}>
+          <label style={{ fontSize: 12, color: '#6b6b66', display: 'block', marginBottom: 4 }}>Empleado</label>
+          <select value={form.empleadoId}
+            onChange={e => {
+              const emp = lista.find(x => x.id === e.target.value)
+              setForm(f => ({ ...f, empleadoId: e.target.value, empleadoNombre: emp?.nombre ?? '' }))
+            }}
+            style={{ width: '100%', fontSize: 13, padding: '7px 10px', borderRadius: 8, border: '1px solid #d4d2ca' }}>
+            <option value="">Seleccioná un empleado…</option>
+            {lista.map(emp => <option key={emp.id} value={emp.id}>{emp.nombre}</option>)}
+          </select>
+        </div>
         {[
-          { label: 'Empleado', type: 'text', value: form.empleadoNombre, onChange: (v: string) => setForm(f => ({ ...f, empleadoNombre: v })) },
           { label: 'Fecha', type: 'date', value: form.fecha, onChange: (v: string) => setForm(f => ({ ...f, fecha: v })) },
           { label: 'Detalle', type: 'text', value: form.detalle, onChange: (v: string) => setForm(f => ({ ...f, detalle: v })) },
         ].map(field => (
@@ -116,7 +131,7 @@ function NuevaNovedadModal({ onClose, onSave }: NuevaNovedadModalProps) {
         )}
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
           <Button onClick={onClose} disabled={saving}>Cancelar</Button>
-          <Button variant="primary" onClick={handleSave} disabled={saving}>{saving ? 'Guardando…' : 'Guardar'}</Button>
+          <Button variant="primary" onClick={handleSave} disabled={saving || !form.empleadoId}>{saving ? 'Guardando…' : 'Guardar'}</Button>
         </div>
       </div>
     </div>

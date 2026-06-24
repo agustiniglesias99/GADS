@@ -4,7 +4,7 @@ import { Badge } from '../../components/ui/Badge'
 import { Button } from '../../components/ui/Button'
 import { Loading, ErrorBox } from '../../components/ui/States'
 import { useQuery } from '../../lib/useQuery'
-import { fetchRegistros, fetchEmpleados } from '../../lib/api'
+import { fetchRegistros, fetchEmpleados, createNovedad, updateRegistroEstado } from '../../lib/api'
 import type { BadgeVariant, RegistroDia } from '../../types'
 
 const estadoBadge: Record<string, BadgeVariant> = {
@@ -57,6 +57,7 @@ export function Fichadas() {
   const [filterEstado, setFilterEstado] = useState('todos')
   const [selectedEmpleado, setSelectedEmpleado] = useState<RegistroDia | null>(null)
   const [modalOpen, setModalOpen] = useState(false)
+  const [actionLoading, setActionLoading] = useState(false)
 
   const registros = registrosDia.filter(r => r.fecha === selectedDate)
   const registrosConNombre = registros.map(r => ({
@@ -82,6 +83,69 @@ export function Fichadas() {
   }, {} as Record<string, number>)
   const totalFichadas = registros.length
 
+  function handleExportCSV() {
+    const escapeCsv = (v: string | number) => {
+      const s = String(v)
+      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
+    }
+    const headers = ['Empleado', 'Fecha', 'Entrada', 'Descanso inicio', 'Descanso fin', 'Salida', 'Estado', 'Origen', 'Min. tardanza', 'Min. extra']
+    const rows = filtrados.map(r => [
+      r.nombre, r.fecha, r.entrada ?? '', r.descansoInicio ?? '', r.descansoFin ?? '', r.salida ?? '',
+      estadoLabel[r.estado] ?? r.estado, origenLabel[r.origen] ?? r.origen,
+      r.minutosTardanza ?? '', r.minutosExtra ?? '',
+    ])
+    const csv = [headers, ...rows].map(r => r.map(escapeCsv).join(',')).join('\n')
+    const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `fichadas_${selectedDate}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  function closeModal() {
+    setModalOpen(false)
+    setSelectedEmpleado(null)
+  }
+
+  async function justificarAusencia() {
+    if (!selectedEmpleado) return
+    setActionLoading(true)
+    try {
+      const nombre = empleados.find(e => e.id === selectedEmpleado.empleadoId)?.nombre ?? selectedEmpleado.empleadoId
+      await createNovedad({
+        empleadoId: selectedEmpleado.empleadoId,
+        empleadoNombre: nombre,
+        fecha: selectedEmpleado.fecha,
+        tipo: 'ausencia_justificada',
+        detalle: 'Justificada por RRHH',
+        origen: 'manual',
+        estado: 'aprobada',
+      })
+      closeModal()
+      reload()
+    } catch (e) {
+      alert(e instanceof Error ? e.message : String(e))
+    } finally {
+      setActionLoading(false)
+    }
+  }
+
+  async function resolverAnomalia() {
+    if (!selectedEmpleado) return
+    setActionLoading(true)
+    try {
+      await updateRegistroEstado(selectedEmpleado.empleadoId, selectedEmpleado.fecha, 'presente')
+      closeModal()
+      reload()
+    } catch (e) {
+      alert(e instanceof Error ? e.message : String(e))
+    } finally {
+      setActionLoading(false)
+    }
+  }
+
   return (
     <div style={{ padding: '24px 32px' }}>
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 20 }}>
@@ -92,7 +156,7 @@ export function Fichadas() {
           </div>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
-          <Button>Exportar CSV</Button>
+          <Button onClick={handleExportCSV}>Exportar CSV</Button>
           <input type="date" value={selectedDate} onChange={e => setSelectedDate(e.target.value)}
             style={{ fontSize: 13, padding: '6px 10px', borderRadius: 8, border: '1px solid #d4d2ca', background: '#fff' }} />
         </div>
@@ -231,8 +295,8 @@ export function Fichadas() {
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
               <Button onClick={() => setModalOpen(false)}>Cerrar</Button>
-              {selectedEmpleado.estado === 'ausente' && <Button variant="primary">Justificar ausencia</Button>}
-              {selectedEmpleado.estado === 'anomalia' && <Button variant="primary">Resolver anomalía</Button>}
+              {selectedEmpleado.estado === 'ausente' && <Button variant="primary" onClick={justificarAusencia} disabled={actionLoading}>{actionLoading ? 'Procesando…' : 'Justificar ausencia'}</Button>}
+              {selectedEmpleado.estado === 'anomalia' && <Button variant="primary" onClick={resolverAnomalia} disabled={actionLoading}>{actionLoading ? 'Procesando…' : 'Resolver anomalía'}</Button>}
             </div>
           </div>
         </div>

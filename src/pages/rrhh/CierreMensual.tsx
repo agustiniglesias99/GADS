@@ -4,7 +4,7 @@ import { Badge } from '../../components/ui/Badge'
 import { Button } from '../../components/ui/Button'
 import { Loading, ErrorBox } from '../../components/ui/States'
 import { useQuery } from '../../lib/useQuery'
-import { fetchCierres, fetchResumen, fetchNovedades } from '../../lib/api'
+import { fetchCierres, fetchResumen, fetchNovedades, updateCierreEstado } from '../../lib/api'
 import type { ResumenEmpleado } from '../../types'
 
 const fmtMin = (m: number) => (m ? `${Math.floor(m / 60)}h ${m % 60}m` : '—')
@@ -53,6 +53,7 @@ export function CierreMensual() {
   }, [])
   const [periodo, setPeriodo] = useState('Abril 2025')
   const [selectedResumen, setSelectedResumen] = useState<ResumenEmpleado | null>(null)
+  const [ejecutando, setEjecutando] = useState(false)
 
   if (loading) return <div style={{ padding: '24px 32px' }}><Loading /></div>
   if (error) return <div style={{ padding: '24px 32px' }}><ErrorBox message={error} onRetry={reload} /></div>
@@ -76,21 +77,85 @@ export function CierreMensual() {
     { label: 'Ejecutar cierre y exportar', sub: puedeEjecutar ? 'Disponible' : 'Bloqueado hasta paso 4', done: cerrado },
   ]
 
-  function handleExportCSV() {
-    const headers = ['Legajo', 'Empleado', 'DNI', 'CUIL', 'Días trabajados', 'Aus. just.', 'Aus. injust.', 'Tardanzas (min)', 'H. extra 50% (min)', 'H. extra 100% (min)', 'Licencias', 'Vacaciones']
-    const rows = resumenEmpleados.map(r => [
-      r.legajo, r.nombre, r.dni, r.cuil,
-      r.diasTrabajados, r.ausenciasJustificadas, r.ausenciasInjustificadas,
-      r.tardanzasMin, r.horasExtra50, r.horasExtra100, r.licencias, r.vacaciones,
-    ])
-    const csv = [headers, ...rows].map(r => r.join(',')).join('\n')
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+  const exportHeaders = ['Legajo', 'Empleado', 'DNI', 'CUIL', 'Días trabajados', 'Aus. just.', 'Aus. injust.', 'Tardanzas (min)', 'H. extra 50% (min)', 'H. extra 100% (min)', 'Licencias', 'Vacaciones']
+  const exportRows: (string | number)[][] = resumenEmpleados.map(r => [
+    r.legajo, r.nombre, r.dni, r.cuil,
+    r.diasTrabajados, r.ausenciasJustificadas, r.ausenciasInjustificadas,
+    r.tardanzasMin, r.horasExtra50, r.horasExtra100, r.licencias, r.vacaciones,
+  ])
+  const fileBase = `cierre_${periodo.replace(/\s+/g, '_')}`
+
+  const escapeHtml = (v: string | number) =>
+    String(v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+
+  function downloadBlob(content: string, type: string, filename: string) {
+    const blob = new Blob([content], { type })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `novedades_${periodo.replace(' ', '_')}.csv`
+    a.download = filename
     a.click()
     URL.revokeObjectURL(url)
+  }
+
+  function buildTableHtml() {
+    const thead = `<tr>${exportHeaders.map(h => `<th>${escapeHtml(h)}</th>`).join('')}</tr>`
+    const tbody = exportRows.map(row => `<tr>${row.map(c => `<td>${escapeHtml(c)}</td>`).join('')}</tr>`).join('')
+    return { thead, tbody }
+  }
+
+  function handleExportCSV() {
+    const escapeCsv = (v: string | number) => {
+      const s = String(v)
+      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
+    }
+    const csv = [exportHeaders, ...exportRows].map(r => r.map(escapeCsv).join(',')).join('\n')
+    downloadBlob('﻿' + csv, 'text/csv;charset=utf-8;', `${fileBase}.csv`)
+  }
+
+  function handleExportExcel() {
+    const { thead, tbody } = buildTableHtml()
+    const html = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="utf-8"></head><body><table border="1"><thead>${thead}</thead><tbody>${tbody}</tbody></table></body></html>`
+    downloadBlob(html, 'application/vnd.ms-excel;charset=utf-8;', `${fileBase}.xls`)
+  }
+
+  function handleExportPDF() {
+    const { thead, tbody } = buildTableHtml()
+    const win = window.open('', '_blank')
+    if (!win) {
+      alert('Permití las ventanas emergentes para exportar el PDF.')
+      return
+    }
+    win.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${escapeHtml(fileBase)}</title>
+      <style>
+        body{font-family:Arial,Helvetica,sans-serif;padding:24px;color:#1a1814}
+        h1{font-size:18px;margin:0 0 4px}
+        .sub{color:#6b6b66;font-size:12px;margin-bottom:16px}
+        table{width:100%;border-collapse:collapse;font-size:11px}
+        th,td{border:1px solid #ccc;padding:5px 7px;text-align:left}
+        th{background:#f0ede6;text-transform:uppercase;font-size:10px;letter-spacing:.04em}
+      </style></head><body>
+      <h1>Preliquidación — ${escapeHtml(periodo)}</h1>
+      <div class="sub">Metalúrgica San Justo S.R.L. — generado ${new Date().toLocaleDateString('es-AR')}</div>
+      <table><thead>${thead}</thead><tbody>${tbody}</tbody></table>
+      <script>window.onload=function(){window.print()}</script>
+      </body></html>`)
+    win.document.close()
+  }
+
+  async function handleEjecutarCierre() {
+    if (!cierre || !puedeEjecutar) return
+    setEjecutando(true)
+    try {
+      const hoy = new Date()
+      const fechaCierre = `${String(hoy.getDate()).padStart(2, '0')}/${String(hoy.getMonth() + 1).padStart(2, '0')}/${hoy.getFullYear()}`
+      await updateCierreEstado(cierre.id, 'cerrado', fechaCierre)
+      reload()
+    } catch (e) {
+      alert(e instanceof Error ? e.message : String(e))
+    } finally {
+      setEjecutando(false)
+    }
   }
 
   return (
@@ -166,8 +231,8 @@ export function CierreMensual() {
                 {puedeEjecutar ? 'Resumen listo para exportar.' : 'Deshabilitado hasta resolver todas las novedades pendientes.'}
               </div>
               <Button disabled={!puedeEjecutar} onClick={handleExportCSV}>Exportar CSV</Button>
-              <Button disabled={!puedeEjecutar}>Exportar Excel</Button>
-              <Button disabled={!puedeEjecutar}>Exportar PDF</Button>
+              <Button disabled={!puedeEjecutar} onClick={handleExportExcel}>Exportar Excel</Button>
+              <Button disabled={!puedeEjecutar} onClick={handleExportPDF}>Exportar PDF</Button>
             </div>
             {!puedeEjecutar && <div style={{ fontSize: 11, color: '#888780', marginTop: 8 }}>Resolvé las novedades pendientes para habilitar la exportación</div>}
           </div>
@@ -220,8 +285,8 @@ export function CierreMensual() {
             </table>
           </div>
 
-          <Button variant="primary" disabled={!puedeEjecutar} style={{ width: '100%', padding: '10px', fontSize: 13 }}>
-            Ejecutar cierre de {periodo}
+          <Button variant="primary" disabled={!puedeEjecutar || ejecutando} onClick={handleEjecutarCierre} style={{ width: '100%', padding: '10px', fontSize: 13 }}>
+            {ejecutando ? 'Ejecutando…' : `Ejecutar cierre de ${periodo}`}
           </Button>
           <div style={{ fontSize: 11, color: '#888780', textAlign: 'center', marginTop: 6 }}>
             {puedeEjecutar ? 'Todos los pasos completos' : 'Disponible cuando todos los pasos estén completos'}

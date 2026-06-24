@@ -1,10 +1,11 @@
+import { useState } from 'react'
 import { MetricCard } from '../../components/ui/MetricCard'
 import { Badge } from '../../components/ui/Badge'
 import { Button } from '../../components/ui/Button'
 import { Loading, ErrorBox } from '../../components/ui/States'
 import { useQuery } from '../../lib/useQuery'
 import { fetchEmpleado, fetchNovedadesByEmpleado, setNovedadEstado } from '../../lib/api'
-import type { BadgeVariant, EstadoNovedad, TipoNovedad } from '../../types'
+import type { BadgeVariant, EstadoNovedad, TipoNovedad, Novedad } from '../../types'
 
 const tipoLabel: Record<TipoNovedad, string> = {
   tardanza: 'Tardanza',
@@ -59,6 +60,7 @@ export function EmpleadoDetalle({ empleadoId, onBack }: Props) {
 
   const emp = data?.emp ?? null
   const novedadesData = data?.novedades ?? []
+  const [selectedNov, setSelectedNov] = useState<Novedad | null>(null)
 
   async function aprobar(id: string) {
     await setNovedadEstado(id, 'aprobada')
@@ -73,6 +75,28 @@ export function EmpleadoDetalle({ empleadoId, onBack }: Props) {
       <div style={{ color: '#8f8d84', fontSize: 14 }}>No se encontró el empleado.</div>
     </div>
   )
+
+  function handleExportResumen() {
+    const escapeCsv = (v: string | number) => {
+      const s = String(v)
+      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
+    }
+    const lines: string[] = []
+    lines.push(['Legajo', 'Nombre', 'DNI', 'CUIL', 'Categoría', 'Jornada', 'Turno', 'Convenio', 'Estado'].join(','))
+    lines.push([emp!.legajo, emp!.nombre, emp!.dni, emp!.cuil, emp!.categoria, emp!.jornada, emp!.turno, emp!.convenio, emp!.estado].map(escapeCsv).join(','))
+    lines.push('')
+    lines.push(['Fecha', 'Tipo', 'Detalle', 'Origen', 'Estado'].join(','))
+    novedadesData.forEach(n => {
+      lines.push([n.fecha, tipoLabel[n.tipo], n.detalle, n.origen, n.estado].map(escapeCsv).join(','))
+    })
+    const blob = new Blob(['﻿' + lines.join('\n')], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `resumen_${emp!.legajo}_${emp!.nombre.replace(/\s+/g, '_')}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
 
   return (
     <div style={{ padding: '24px 32px' }}>
@@ -113,7 +137,7 @@ export function EmpleadoDetalle({ empleadoId, onBack }: Props) {
               </div>
             ))}
           </div>
-          <Button style={{ width: '100%' }}>Exportar resumen</Button>
+          <Button onClick={handleExportResumen} style={{ width: '100%' }}>Exportar resumen</Button>
         </div>
 
         <div>
@@ -177,7 +201,7 @@ export function EmpleadoDetalle({ empleadoId, onBack }: Props) {
                       {n.estado === 'pendiente' ? (
                         <Button variant="sm" onClick={() => aprobar(n.id)}>Aprobar</Button>
                       ) : (
-                        <Button variant="sm">Ver</Button>
+                        <Button variant="sm" onClick={() => setSelectedNov(n)}>Ver</Button>
                       )}
                     </td>
                   </tr>
@@ -187,6 +211,29 @@ export function EmpleadoDetalle({ empleadoId, onBack }: Props) {
           </div>
         </div>
       </div>
+
+      {selectedNov && (
+        <div className="modal-overlay" style={{ position: 'fixed', inset: 0, background: 'rgba(26,24,20,0.38)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200, padding: 20 }}
+          onClick={() => setSelectedNov(null)}>
+          <div className="modal-card" style={{ background: '#fff', borderRadius: 16, padding: 24, width: 420, boxShadow: 'var(--shadow-lg)', border: '1px solid var(--border)' }} onClick={e => e.stopPropagation()}>
+            <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 4 }}>{tipoLabel[selectedNov.tipo]}</div>
+            <div style={{ fontSize: 13, color: '#6b6b66', marginBottom: 16 }}>{selectedNov.fecha.split('-').reverse().join('/')}</div>
+            {([
+              ['Detalle', selectedNov.detalle || '—'],
+              ['Origen', selectedNov.origen === 'automatica' ? 'Automática (motor de reglas)' : 'Manual (RRHH)'],
+              ['Estado', selectedNov.estado.charAt(0).toUpperCase() + selectedNov.estado.slice(1)],
+            ] as [string, string][]).map(([l, v]) => (
+              <div key={l} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', fontSize: 13, borderBottom: '1px solid #f0ede6' }}>
+                <span style={{ color: '#6b6b66' }}>{l}</span>
+                <span style={{ fontWeight: 500 }}>{v}</span>
+              </div>
+            ))}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 20 }}>
+              <Button onClick={() => setSelectedNov(null)}>Cerrar</Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

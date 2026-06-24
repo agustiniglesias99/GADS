@@ -4,6 +4,7 @@ import type {
   TipoNovedad, EstadoNovedad, OrigenNovedad,
 } from '../types'
 import type { Database } from './database.types'
+import { interpretarFichada, type AccionFichada } from './asistencia'
 
 type Tables = Database['public']['Tables']
 type EmpleadoRow = Tables['empleados']['Row']
@@ -89,6 +90,13 @@ export async function fetchRegistros(): Promise<RegistroDia[]> {
   return unwrap(res).map(toRegistro)
 }
 
+export async function fetchRegistroDia(empleadoId: string, fecha: string): Promise<RegistroDia | null> {
+  const res = await supabase.from('registros_dia').select('*')
+    .eq('empleado_id', empleadoId).eq('fecha', fecha).maybeSingle()
+  const row = unwrap(res)
+  return row ? toRegistro(row) : null
+}
+
 export async function fetchCierres(): Promise<CierreMensual[]> {
   const res = await supabase.from('cierres_mensuales').select('*').order('id')
   return unwrap(res).map(toCierre)
@@ -127,4 +135,87 @@ export async function createNovedad(input: NuevaNovedadInput): Promise<Novedad> 
     estado: input.estado ?? 'pendiente',
   }).select().single()
   return toNovedad(unwrap(res))
+}
+
+export async function updateRegistroEstado(
+  empleadoId: string, fecha: string, estado: RegistroDia['estado'],
+): Promise<RegistroDia> {
+  const res = await supabase.from('registros_dia')
+    .update({ estado })
+    .eq('empleado_id', empleadoId).eq('fecha', fecha)
+    .select().single()
+  return toRegistro(unwrap(res))
+}
+
+export async function updateCierreEstado(
+  id: string, estado: CierreMensual['estado'], fechaCierre: string,
+): Promise<CierreMensual> {
+  const res = await supabase.from('cierres_mensuales')
+    .update({ estado, fecha_cierre: fechaCierre })
+    .eq('id', id)
+    .select().single()
+  return toCierre(unwrap(res))
+}
+
+export interface NuevoEmpleadoInput {
+  legajo: string
+  nombre: string
+  dni: string
+  cuil: string
+  categoria: string
+  jornada: string
+  ingreso: string
+  convenio: string
+  turno: string
+  tolerancia: number
+  fichada: string
+  email: string
+  estado?: Empleado['estado']
+}
+
+export async function createEmpleado(input: NuevoEmpleadoInput): Promise<Empleado> {
+  const iniciales = input.nombre.trim().split(/\s+/).map(w => w[0] ?? '').slice(0, 2).join('').toUpperCase()
+  const res = await supabase.from('empleados').insert({
+    id: `e${Date.now()}`,
+    legajo: input.legajo, nombre: input.nombre, iniciales,
+    dni: input.dni, cuil: input.cuil, categoria: input.categoria,
+    jornada: input.jornada, ingreso: input.ingreso, convenio: input.convenio,
+    turno: input.turno, tolerancia: input.tolerancia, fichada: input.fichada,
+    estado: input.estado ?? 'activo', email: input.email,
+  }).select().single()
+  return toEmpleado(unwrap(res))
+}
+
+export interface FichadaResult {
+  accion: AccionFichada
+  hora: string
+  registro: RegistroDia
+}
+
+/**
+ * Registra la fichada del empleado para una fecha (ingreso o egreso, decidido
+ * por interpretarFichada). Hace upsert sobre (empleado_id, fecha) con origen QR.
+ */
+export async function registrarFichada(emp: Empleado, fecha: string): Promise<FichadaResult> {
+  const actual = await fetchRegistroDia(emp.id, fecha)
+  const r = interpretarFichada(emp, actual)
+  if (!r.ok) throw new Error(r.error)
+
+  const row = {
+    empleado_id: emp.id,
+    fecha,
+    entrada: r.accion === 'ingreso' ? r.hora : (actual?.entrada ?? null),
+    descanso_inicio: actual?.descansoInicio ?? null,
+    descanso_fin: actual?.descansoFin ?? null,
+    salida: r.accion === 'egreso' ? r.hora : (actual?.salida ?? null),
+    estado: r.estado,
+    origen: 'qr' as const,
+    minutos_extra: r.minutosExtra ?? null,
+    minutos_tardanza: r.minutosTardanza ?? null,
+  }
+
+  const res = await supabase.from('registros_dia')
+    .upsert(row, { onConflict: 'empleado_id,fecha' })
+    .select().single()
+  return { accion: r.accion, hora: r.hora, registro: toRegistro(unwrap(res)) }
 }
