@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { MetricCard } from '../../components/ui/MetricCard'
 import { Badge } from '../../components/ui/Badge'
 import { Button } from '../../components/ui/Button'
@@ -23,6 +24,13 @@ const estadoBadge: Record<EstadoNovedad, BadgeVariant> = {
   aprobada: 'success',
   rechazada: 'danger',
   justificada: 'info',
+}
+
+const MESES_ES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
+
+function fechaToMesPeriodo(fecha: string) {
+  const [y, m] = fecha.split('-')
+  return `${MESES_ES[parseInt(m) - 1]} ${y}`
 }
 
 const diasSemana = ['Lun 8/4', 'Mar 9/4', 'Mié 10/4', 'Jue 11/4', 'Vie 12/4', 'Hoy 14/4']
@@ -54,6 +62,7 @@ export function Dashboard({ onNavigate }: Props) {
     ])
     return { novedades, empleados, registros }
   }, [])
+  const [periodo, setPeriodo] = useState('')
 
   async function aprobar(id: string) {
     await setNovedadEstado(id, 'aprobada')
@@ -63,20 +72,40 @@ export function Dashboard({ onNavigate }: Props) {
   const novedadesData = data?.novedades ?? []
   const empleados = data?.empleados ?? []
   const registrosDia = data?.registros ?? []
-  const pendientes = novedadesData.filter(n => n.estado === 'pendiente')
-  const ultimasNovedades = [...novedadesData].sort((a, b) => b.fecha.localeCompare(a.fecha)).slice(0, 5)
+
+  const periodos = Array.from(new Set(novedadesData.map(n => fechaToMesPeriodo(n.fecha))))
+    .sort((a, b) => {
+      const [ma, ya] = a.split(' ')
+      const [mb, yb] = b.split(' ')
+      const toNum = (mes: string, anio: string) => parseInt(anio) * 12 + MESES_ES.indexOf(mes)
+      return toNum(ma, ya) - toNum(mb, yb)
+    })
+  const periodoActivo = periodo || periodos[periodos.length - 1] || ''
+
+  const novedadesDelMes = novedadesData.filter(n => fechaToMesPeriodo(n.fecha) === periodoActivo)
+  const pendientes = novedadesDelMes.filter(n => n.estado === 'pendiente')
+  const ultimasNovedades = [...novedadesDelMes].sort((a, b) => b.fecha.localeCompare(a.fecha)).slice(0, 5)
   const fichadas = registrosDia.filter(r => r.fecha === '2025-04-14')
   const presentes = fichadas.filter(r => r.estado !== 'ausente').length
   const ausentes = fichadas.filter(r => r.estado === 'ausente').length
 
   return (
     <div style={{ padding: '24px 32px' }}>
-      <div style={{ fontSize: 20, fontWeight: 600, marginBottom: 2 }}>Dashboard</div>
-      <div style={{ fontSize: 13, color: '#6b6b66', marginBottom: 20 }}>Abril 2025 — Empresa: Metalúrgica San Justo S.R.L.</div>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 20 }}>
+        <div>
+          <div style={{ fontSize: 20, fontWeight: 600, marginBottom: 2 }}>Dashboard</div>
+          <div style={{ fontSize: 13, color: '#6b6b66' }}>{periodoActivo} — Metalúrgica San Justo S.R.L.</div>
+        </div>
+        {!loading && !error && periodos.length > 0 && (
+          <select value={periodoActivo} onChange={e => setPeriodo(e.target.value)}
+            style={{ fontSize: 13, padding: '5px 10px', borderRadius: 8, border: '1px solid #d4d2ca' }}>
+            {periodos.map(p => <option key={p} value={p}>{p}</option>)}
+          </select>
+        )}
+      </div>
 
       {loading ? <Loading /> : error ? <ErrorBox message={error} onRetry={reload} /> : (
       <>
-
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12, marginBottom: 20 }}>
         <MetricCard label="Empleados activos" value={empleados.filter(e => e.estado === 'activo').length} sub="1 suspendido" />
         <MetricCard label="Ficharon hoy" value={presentes} valueColor="success" sub={`${ausentes} ausentes sin justificar`} />

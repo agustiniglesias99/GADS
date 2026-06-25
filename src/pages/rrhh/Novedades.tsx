@@ -8,6 +8,13 @@ import { fetchNovedades, setNovedadEstado, createNovedad, fetchEmpleados } from 
 import { fechaHoy } from '../../lib/asistencia'
 import type { BadgeVariant, EstadoNovedad, TipoNovedad, Novedad } from '../../types'
 
+const MESES_ES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
+
+function fechaToMesPeriodo(fecha: string) {
+  const [y, m] = fecha.split('-')
+  return `${MESES_ES[parseInt(m) - 1]} ${y}`
+}
+
 const tipoLabel: Record<TipoNovedad, string> = {
   tardanza: 'Tardanza',
   ausencia_injustificada: 'Ausencia injust.',
@@ -151,8 +158,21 @@ export function Novedades({ showNewModal, onCloseNewModal }: Props) {
   const [filterTipo, setFilterTipo] = useState('todos')
   const [selected, setSelected] = useState<Novedad | null>(null)
   const [showNew, setShowNew] = useState(false)
+  const [periodo, setPeriodo] = useState('')
 
-  const filtrados = data.filter(n => {
+  const periodos = Array.from(new Set(data.map(n => fechaToMesPeriodo(n.fecha))))
+    .sort((a, b) => {
+      const [ma, ya] = a.split(' ')
+      const [mb, yb] = b.split(' ')
+      const toNum = (mes: string, anio: string) => parseInt(anio) * 12 + MESES_ES.indexOf(mes)
+      return toNum(ma, ya) - toNum(mb, yb)
+    })
+
+  const periodoActivo = periodo || periodos[periodos.length - 1] || ''
+
+  const dataDelMes = data.filter(n => fechaToMesPeriodo(n.fecha) === periodoActivo)
+
+  const filtrados = dataDelMes.filter(n => {
     const matchSearch = n.empleadoNombre.toLowerCase().includes(search.toLowerCase())
     const matchEstado = filterEstado === 'todos' || n.estado === filterEstado
     const matchTipo = filterTipo === 'todos' || n.tipo === filterTipo
@@ -170,7 +190,7 @@ export function Novedades({ showNewModal, onCloseNewModal }: Props) {
     setData(prev => (prev ?? []).map(n => n.id === id ? { ...n, estado: 'rechazada' } : n))
   }
 
-  const pendientes = data.filter(n => n.estado === 'pendiente').length
+  const pendientes = dataDelMes.filter(n => n.estado === 'pendiente').length
 
   return (
     <div style={{ padding: '24px 32px', height: '100%', display: 'flex', flexDirection: 'column', boxSizing: 'border-box' }}>
@@ -179,16 +199,21 @@ export function Novedades({ showNewModal, onCloseNewModal }: Props) {
           <div style={{ fontSize: 20, fontWeight: 600 }}>Novedades</div>
           <div style={{ fontSize: 13, color: '#6b6b66', marginTop: 2 }}>{pendientes} pendientes de aprobación</div>
         </div>
-        <Button variant="primary" onClick={() => setShowNew(true)}>+ Nueva novedad</Button>
+        {!loading && !error && periodos.length > 0 && (
+          <select value={periodoActivo} onChange={e => setPeriodo(e.target.value)}
+            style={{ fontSize: 13, padding: '5px 10px', borderRadius: 8, border: '1px solid #d4d2ca' }}>
+            {periodos.map(p => <option key={p} value={p}>{p}</option>)}
+          </select>
+        )}
       </div>
 
       {loading ? <Loading /> : error ? <ErrorBox message={error} onRetry={reload} /> : (
       <>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12, marginBottom: 20, flexShrink: 0 }}>
-        <MetricCard label="Total" value={data.length} />
+        <MetricCard label="Total" value={dataDelMes.length} />
         <MetricCard label="Pendientes" value={pendientes} valueColor="warn" />
-        <MetricCard label="Aprobadas" value={data.filter(n => n.estado === 'aprobada').length} valueColor="success" />
-        <MetricCard label="Rechazadas" value={data.filter(n => n.estado === 'rechazada').length} valueColor="danger" />
+        <MetricCard label="Aprobadas" value={dataDelMes.filter(n => n.estado === 'aprobada').length} valueColor="success" />
+        <MetricCard label="Rechazadas" value={dataDelMes.filter(n => n.estado === 'rechazada').length} valueColor="danger" />
       </div>
 
       <div style={{ display: 'flex', gap: 8, marginBottom: 14, flexShrink: 0 }}>

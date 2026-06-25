@@ -288,7 +288,7 @@ export function MiPanel() {
                 </Badge>
               </div>
             )}
-            <Button variant="primary" onClick={() => setShowFichaje(true)} disabled={jornadaCompleta}
+            <Button variant="primary" onClick={() => setShowFichaje(true)} disabled={jornadaCompleta} //
               style={{ width: '100%', padding: '9px 14px', marginTop: 14 }}>
               {jornadaCompleta ? 'Jornada completa' : registro?.entrada ? 'Fichar egreso (QR)' : 'Fichar ingreso (QR)'}
             </Button>

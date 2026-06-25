@@ -199,7 +199,7 @@ export function Fichadas() {
             </thead>
             <tbody>
               {filtrados.map(r => (
-                <tr key={r.empleadoId} style={{ cursor: 'pointer' }} onClick={() => { setSelectedEmpleado(r); setModalOpen(true) }}>
+                <tr key={r.empleadoId} style={{ cursor: 'pointer' }} onClick={() => { setSelectedEmpleado(r);}}>
                   <td style={{ padding: '9px 6px 9px 0', borderBottom: '1px solid #f0ede6', fontWeight: 600 }}>{r.nombre}</td>
                   <td style={{ padding: '9px 6px 9px 0', borderBottom: '1px solid #f0ede6' }}>
                     {r.entrada ?? <span style={{ color: '#aaa' }}>—</span>}
@@ -223,7 +223,7 @@ export function Fichadas() {
                     </span>
                   </td>
                   <td style={{ padding: '9px 0', borderBottom: '1px solid #f0ede6' }}>
-                    <Button variant="sm" onClick={e => { e.stopPropagation(); setSelectedEmpleado(r); setModalOpen(true) }}>
+                    <Button variant="sm" onClick={e => { e.stopPropagation(); setSelectedEmpleado(r);  setModalOpen(true)}}> 
                       {r.estado === 'anomalia' ? 'Resolver' : r.estado === 'ausente' ? 'Justificar' : 'Ver'}
                     </Button>
                   </td>
