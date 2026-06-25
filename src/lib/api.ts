@@ -85,8 +85,17 @@ export async function fetchNovedadesByEmpleado(empleadoId: string): Promise<Nove
   return unwrap(res).map(toNovedad)
 }
 
-export async function fetchRegistros(): Promise<RegistroDia[]> {
-  const res = await supabase.from('registros_dia').select('*').order('fecha', { ascending: false })
+export async function fetchRegistros(fecha?: string): Promise<RegistroDia[]> {
+  let q = supabase.from('registros_dia').select('*')
+  if (fecha) q = q.eq('fecha', fecha)
+  const res = await q.order('fecha', { ascending: false })
+  return unwrap(res).map(toRegistro)
+}
+
+export async function fetchRegistrosMes(empleadoId: string, desde: string, hasta: string): Promise<RegistroDia[]> {
+  const res = await supabase.from('registros_dia').select('*')
+    .eq('empleado_id', empleadoId).gte('fecha', desde).lte('fecha', hasta)
+    .order('fecha', { ascending: true })
   return unwrap(res).map(toRegistro)
 }
 
@@ -100,6 +109,11 @@ export async function fetchRegistroDia(empleadoId: string, fecha: string): Promi
 export async function fetchCierres(): Promise<CierreMensual[]> {
   const res = await supabase.from('cierres_mensuales').select('*').order('id')
   return unwrap(res).map(toCierre)
+}
+
+export async function createCierre(row: CierreRow): Promise<CierreMensual> {
+  const res = await supabase.from('cierres_mensuales').insert(row).select().single()
+  return toCierre(unwrap(res))
 }
 
 export async function fetchResumen(): Promise<ResumenEmpleado[]> {

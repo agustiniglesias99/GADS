@@ -25,16 +25,22 @@ export function ExportarCSV() {
     return { resumen, novedades: novedades.filter(n => n.estado === 'aprobada') }
   }, [])
 
-  const [fechaDesde, setFechaDesde] = useState('2025-04-01')
-  const [fechaHasta, setFechaHasta] = useState('2025-04-30')
+  const [fechaDesde, setFechaDesde] = useState(() => {
+    const hoy = new Date()
+    return `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}-01`
+  })
+  const [fechaHasta, setFechaHasta] = useState(() => {
+    const hoy = new Date()
+    return `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}-${String(hoy.getDate()).padStart(2, '0')}`
+  })
   const [filtered, setFiltered] = useState<ResumenEmpleado[]>([])
   const [novedadesFiltradas, setNovedadesFiltradas] = useState<Novedad[]>([])
   const [hasSearched, setHasSearched] = useState(false)
   const [fechaError, setFechaError] = useState('')
 
   function handleFilter() {
-    if (fechaDesde >= fechaHasta) {
-      setFechaError('La fecha desde debe ser anterior a la fecha hasta.')
+    if (fechaDesde > fechaHasta) {
+      setFechaError('La fecha desde no puede ser mayor que la fecha hasta.')
       return
     }
     setFechaError('')

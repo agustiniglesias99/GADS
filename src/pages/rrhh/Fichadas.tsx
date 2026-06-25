@@ -45,18 +45,19 @@ const origenLabel: Record<string, string> = {
 }
 
 export function Fichadas() {
-  const { data, loading, error, reload } = useQuery(async () => {
-    const [registros, empleados] = await Promise.all([fetchRegistros(), fetchEmpleados()])
-    return { registros, empleados }
-  }, [])
-  const registrosDia = data?.registros ?? []
-  const empleados = data?.empleados ?? []
-
   const [selectedDate, setSelectedDate] = useState(() => {
     const d = new Date()
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
   })
   const [searchTerm, setSearchTerm] = useState('')
+
+  const { data, loading, error, reload } = useQuery(async () => {
+    const [registros, empleados] = await Promise.all([fetchRegistros(selectedDate), fetchEmpleados()])
+    return { registros, empleados }
+  }, [selectedDate])
+  const registrosDia = data?.registros ?? []
+  const empleados = data?.empleados ?? []
+
   const [filterEstado, setFilterEstado] = useState('todos')
   const [selectedEmpleado, setSelectedEmpleado] = useState<RegistroDia | null>(null)
   const [modalOpen, setModalOpen] = useState(false)
@@ -91,9 +92,9 @@ export function Fichadas() {
       const s = String(v)
       return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
     }
-    const headers = ['Empleado', 'Fecha', 'Entrada', 'Descanso inicio', 'Descanso fin', 'Salida', 'Estado', 'Origen', 'Min. tardanza', 'Min. extra']
+    const headers = ['Empleado', 'Fecha', 'Entrada', 'Salida', 'Estado', 'Origen', 'Min. tardanza', 'Min. extra']
     const rows = filtrados.map(r => [
-      r.nombre, r.fecha, r.entrada ?? '', r.descansoInicio ?? '', r.descansoFin ?? '', r.salida ?? '',
+      r.nombre, r.fecha, r.entrada ?? '', r.salida ?? '',
       estadoLabel[r.estado] ?? r.estado, origenLabel[r.origen] ?? r.origen,
       r.minutosTardanza ?? '', r.minutosExtra ?? '',
     ])
@@ -199,7 +200,7 @@ export function Fichadas() {
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
             <thead>
               <tr>
-                {['Empleado', 'Entrada', 'Descanso', 'Salida', 'Estado', 'Origen', ''].map(h => (
+                {['Empleado', 'Entrada', 'Salida', 'Estado', 'Origen', ''].map(h => (
                   <th key={h} style={{ textAlign: 'left', fontWeight: 600, fontSize: 11, color: '#888780', textTransform: 'uppercase', letterSpacing: '0.04em', paddingBottom: 8, borderBottom: '1px solid #e2e0d8', paddingRight: 6 }}>{h}</th>
                 ))}
               </tr>
@@ -212,9 +213,6 @@ export function Fichadas() {
                     {r.entrada ?? <span style={{ color: '#aaa' }}>—</span>}
                     {r.minutosTardanza && <span style={{ fontSize: 11, color: '#b45309', marginLeft: 4 }}>+{r.minutosTardanza} min</span>}
                     {r.estado === 'anomalia' && r.entrada && <span style={{ fontSize: 11, color: '#b91c1c', marginLeft: 4 }}>⚠ doble</span>}
-                  </td>
-                  <td style={{ padding: '9px 6px 9px 0', borderBottom: '1px solid #f0ede6' }}>
-                    {r.descansoInicio && r.descansoFin ? `${r.descansoInicio} / ${r.descansoFin}` : r.entrada ? <span style={{ color: '#b45309' }}>sin desc.</span> : <span style={{ color: '#aaa' }}>—</span>}
                   </td>
                   <td style={{ padding: '9px 6px 9px 0', borderBottom: '1px solid #f0ede6' }}>
                     {r.salida ?? <span style={{ color: '#aaa' }}>—</span>}

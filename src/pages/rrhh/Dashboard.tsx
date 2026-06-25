@@ -38,13 +38,15 @@ function toISO(d: Date) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
-type DayState = 'ok' | 'warn' | 'danger' | 'info'
+type DayState = 'ok' | 'warn' | 'danger' | 'info' | 'salida' | 'sinDesc'
 
 const dayBadge: Record<DayState, { variant: BadgeVariant; label: string }> = {
-  ok:     { variant: 'success', label: 'OK' },
-  warn:   { variant: 'warn',    label: 'Tardanza' },
-  danger: { variant: 'danger',  label: 'Ausente' },
-  info:   { variant: 'info',    label: 'H. Extra' },
+  ok:      { variant: 'success', label: 'OK' },
+  warn:    { variant: 'warn',    label: 'Tardanza' },
+  danger:  { variant: 'danger',  label: 'Ausente' },
+  info:    { variant: 'info',    label: 'H. Extra' },
+  salida:  { variant: 'warn',    label: 'Sal. ant.' },
+  sinDesc: { variant: 'warn',    label: 'Sin desc.' },
 }
 
 interface Props {
@@ -145,7 +147,9 @@ export function Dashboard({ onNavigate }: Props) {
     if (!reg) return null
     if (reg.estado === 'ausente' || reg.estado === 'ausencia_justificada') return 'danger'
     if (reg.estado === 'tardanza') return 'warn'
-    if (reg.estado === 'hora_extra' || reg.estado === 'salida_anticipada' || reg.estado === 'sin_descanso') return 'info'
+    if (reg.estado === 'hora_extra') return 'info'
+    if (reg.estado === 'salida_anticipada') return 'salida'
+    if (reg.estado === 'sin_descanso') return 'sinDesc'
     return 'ok'
   }
 

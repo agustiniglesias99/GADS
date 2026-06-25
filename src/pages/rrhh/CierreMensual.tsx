@@ -5,7 +5,7 @@ import { Badge } from '../../components/ui/Badge'
 import { Button } from '../../components/ui/Button'
 import { Loading, ErrorBox } from '../../components/ui/States'
 import { useQuery } from '../../lib/useQuery'
-import { fetchCierres, fetchEmpleados, fetchNovedades, fetchRegistros, updateCierreEstado } from '../../lib/api'
+import { fetchCierres, fetchEmpleados, fetchNovedades, fetchRegistros, updateCierreEstado, createCierre } from '../../lib/api'
 import type { Empleado, Novedad, RegistroDia, ResumenEmpleado } from '../../types'
 
 const fmtMin = (m: number) => (m ? `${Math.floor(m / 60)}h ${m % 60}m` : '—')
@@ -99,20 +99,62 @@ export function CierreMensual() {
   const [periodo, setPeriodo] = useState('')
   const [selectedResumen, setSelectedResumen] = useState<ResumenEmpleado | null>(null)
   const [ejecutando, setEjecutando] = useState(false)
+  const [generando, setGenerando] = useState(false)
 
   if (loading) return <div style={{ padding: '24px 32px' }}><Loading /></div>
   if (error) return <div style={{ padding: '24px 32px' }}><ErrorBox message={error} onRetry={reload} /></div>
 
-  const cierresMensuales = data!.cierres
+  const periodoToNum = (p: string) => { const [m, y] = p.split(' '); return parseInt(y) * 12 + MESES_ES.indexOf(m) }
+  const cierresMensuales = [...data!.cierres].sort((a, b) => periodoToNum(b.periodo) - periodoToNum(a.periodo))
   const novedades = data!.novedades
   const mesActual = `${MESES_ES[new Date().getMonth()]} ${new Date().getFullYear()}`
   const periodos = cierresMensuales.map(c => c.periodo)
-  const periodoActivo = periodo || (periodos.includes(mesActual) ? mesActual : cierresMensuales[cierresMensuales.length - 1]?.periodo) || ''
+  const periodoActivo = periodo || (periodos.includes(mesActual) ? mesActual : cierresMensuales[0]?.periodo) || ''
   const resumenEmpleados = calcularResumen(data!.empleados, novedades, data!.registros, periodoActivo)
   const cierre = cierresMensuales.find(c => c.periodo === periodoActivo) ?? cierresMensuales[0]
   const pendientes = novedades.filter(n => n.estado === 'pendiente' && fechaToMesPeriodo(n.fecha) === periodoActivo).length
 
-  if (!cierre) return <div style={{ padding: '24px 32px', color: '#8f8d84', fontSize: 14 }}>No hay períodos de cierre cargados.</div>
+  if (cierresMensuales.length === 0) {
+    async function handleGenerarCierre() {
+      setGenerando(true)
+      try {
+        const hoy = new Date()
+        const y = hoy.getFullYear()
+        const m = hoy.getMonth()
+        const lastDay = new Date(y, m + 1, 0).getDate()
+        await createCierre({
+          id: crypto.randomUUID(),
+          periodo: `${MESES_ES[m]} ${y}`,
+          fecha_cierre: `${y}-${String(m + 1).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`,
+          estado: 'abierto',
+          total_empleados: data!.empleados.filter(e => e.estado === 'activo').length,
+          novedades_aprobadas: 0,
+          novedades_pendientes: 0,
+        })
+        reload()
+      } catch (e) {
+        alert(e instanceof Error ? e.message : String(e))
+      } finally {
+        setGenerando(false)
+      }
+    }
+    return (
+      <div style={{ padding: '24px 32px' }}>
+        <div style={{ fontSize: 20, fontWeight: 600, marginBottom: 2 }}>Cierre mensual</div>
+        <div style={{ fontSize: 13, color: '#6b6b66', marginBottom: 24 }}>{mesActual} — Metalúrgica San Justo S.R.L.</div>
+        <div style={{ background: '#fff', border: '1px solid #e2e0d8', borderRadius: 12, padding: 40, textAlign: 'center', maxWidth: 480 }}>
+          <div style={{ fontSize: 13, color: '#6b6b66', marginBottom: 20 }}>
+            No hay períodos de cierre cargados. Generá el cierre de <strong>{mesActual}</strong> para comenzar.
+          </div>
+          <Button variant="primary" onClick={handleGenerarCierre} disabled={generando}>
+            {generando ? 'Generando…' : '+ Generar cierre mensual'}
+          </Button>
+        </div>
+      </div>
+    )
+  }
+
+  if (!cierre) return null
 
   const cerrado = cierre.estado === 'cerrado'
   const puedeEjecutar = pendientes === 0 && !cerrado

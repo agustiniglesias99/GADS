@@ -8,7 +8,7 @@ import { Loading, ErrorBox } from '../../components/ui/States'
 // Carga diferida: html5-qrcode es pesado y solo se necesita al fichar.
 const QRScanner = lazy(() => import('../../components/ui/QRScanner').then(m => ({ default: m.QRScanner })))
 import { useQuery } from '../../lib/useQuery'
-import { fetchEmpleado, fetchNovedadesByEmpleado, createNovedad, fetchRegistroDia, registrarFichada, type FichadaResult } from '../../lib/api'
+import { fetchEmpleado, fetchNovedadesByEmpleado, createNovedad, fetchRegistroDia, fetchRegistrosMes, registrarFichada, type FichadaResult } from '../../lib/api'
 import { isQRTokenValid, fechaHoy } from '../../lib/asistencia'
 import { useAuth } from '../../context/AuthContext'
 import type { BadgeVariant, EstadoNovedad, TipoNovedad, Novedad, Empleado, RegistroDia } from '../../types'
@@ -41,7 +41,7 @@ const registroEstadoLabel: Record<string, string> = {
   salida_anticipada: 'Salida anticipada', sin_descanso: 'Sin descanso', ausente: 'Ausente', anomalia: 'Anomalía',
 }
 
-type DayType = 'ok' | 'warn' | 'danger' | 'info' | 'gray' | 'empty'
+type DayType = 'ok' | 'warn' | 'danger' | 'info' | 'gray' | 'empty' | 'future' | 'today'
 const dayStyle: Record<DayType, { bg: string; color: string }> = {
   ok:     { bg: '#dcfce7', color: '#166534' },
   warn:   { bg: '#fef3c7', color: '#92400e' },
@@ -49,15 +49,23 @@ const dayStyle: Record<DayType, { bg: string; color: string }> = {
   info:   { bg: '#dbeafe', color: '#1e40af' },
   gray:   { bg: '#f0ede6', color: '#888780' },
   empty:  { bg: 'transparent', color: 'transparent' },
+  future: { bg: 'transparent', color: '#c4c2ba' },
+  today:  { bg: '#faf5ff', color: '#7c3aed' },
 }
 
-const abril2025: [number, DayType][] = [
-  [0, 'empty'], [1, 'ok'], [2, 'ok'], [3, 'ok'], [4, 'ok'], [5, 'gray'], [6, 'gray'],
-  [7, 'ok'], [8, 'ok'], [9, 'warn'], [10, 'ok'], [11, 'ok'], [12, 'gray'], [13, 'gray'],
-  [14, 'warn'], [15, 'danger'], [16, 'ok'], [17, 'ok'], [18, 'info'], [19, 'gray'], [20, 'gray'],
-  [21, 'ok'], [22, 'danger'], [23, 'ok'], [24, 'ok'], [25, 'ok'], [26, 'gray'], [27, 'gray'],
-  [28, 'ok'], [29, 'ok'], [30, 'gray'],
-]
+function estadoToDayType(estado: string): DayType {
+  switch (estado) {
+    case 'presente': return 'ok'
+    case 'tardanza': return 'warn'
+    case 'hora_extra': return 'info'
+    case 'sin_descanso': return 'warn'
+    case 'salida_anticipada': return 'warn'
+    case 'ausente': return 'danger'
+    case 'ausencia_justificada': return 'info'
+    case 'anomalia': return 'danger'
+    default: return 'gray'
+  }
+}
 
 function SolicitudModal({ onClose, onSave, empleadoNombre }: { onClose: () => void; onSave: (n: Novedad) => void; empleadoNombre: string }) {
   const { user } = useAuth()
@@ -235,12 +243,17 @@ export function MiPanel() {
   const { user } = useAuth()
   const empleadoId = user?.empleadoId
   const hoy = fechaHoy()
+  const mesLabel = new Date(hoy + 'T12:00:00').toLocaleDateString('es-AR', { month: 'long', year: 'numeric' })
+  const hoyDate = new Date(hoy + 'T12:00:00')
+  const mesDesde = `${hoyDate.getFullYear()}-${String(hoyDate.getMonth() + 1).padStart(2, '0')}-01`
+  const mesHasta = `${hoyDate.getFullYear()}-${String(hoyDate.getMonth() + 1).padStart(2, '0')}-${String(new Date(hoyDate.getFullYear(), hoyDate.getMonth() + 1, 0).getDate()).padStart(2, '0')}`
   const { data, loading, error, reload, setData } = useQuery(async () => {
-    if (!empleadoId) return { emp: null, novedades: [], registro: null }
-    const [emp, novedades, registro] = await Promise.all([
-      fetchEmpleado(empleadoId), fetchNovedadesByEmpleado(empleadoId), fetchRegistroDia(empleadoId, hoy),
+    if (!empleadoId) return { emp: null, novedades: [], registro: null, registrosMes: [] }
+    const [emp, novedades, registro, registrosMes] = await Promise.all([
+      fetchEmpleado(empleadoId), fetchNovedadesByEmpleado(empleadoId),
+      fetchRegistroDia(empleadoId, hoy), fetchRegistrosMes(empleadoId, mesDesde, mesHasta),
     ])
-    return { emp, novedades, registro }
+    return { emp, novedades, registro, registrosMes }
   }, [empleadoId])
   const [showModal, setShowModal] = useState(false)
   const [showFichaje, setShowFichaje] = useState(false)
@@ -251,15 +264,53 @@ export function MiPanel() {
   const emp = data?.emp ?? null
   const misNovedades = data?.novedades ?? []
   const registro = data?.registro ?? null
+  const registrosMes = data?.registrosMes ?? []
   const jornadaCompleta = !!(registro?.entrada && registro?.salida)
   const pendientes = misNovedades.filter(n => n.estado === 'pendiente').length
+
+  // Métricas del mes
+  const year = hoyDate.getFullYear()
+  const month = hoyDate.getMonth()
+  const todayNum = hoyDate.getDate()
+  const lastDay = new Date(year, month + 1, 0).getDate()
+  const diasLaborables = Array.from({ length: todayNum }, (_, i) => i + 1)
+    .filter(d => { const w = new Date(year, month, d).getDay(); return w !== 0 && w !== 6 }).length
+  const diasTrabajados = registrosMes.filter(r => !['ausente', 'ausencia_justificada'].includes(r.estado)).length
+  const tardanzasCount = registrosMes.filter(r => r.estado === 'tardanza').length
+  const tardanzasMin = registrosMes.reduce((s, r) => s + (r.minutosTardanza ?? 0), 0)
+  const ausenciasCount = registrosMes.filter(r => r.estado === 'ausente' || r.estado === 'ausencia_justificada').length
+  const ausenciasJust = registrosMes.filter(r => r.estado === 'ausencia_justificada').length
+  const horasExtraMin = registrosMes.reduce((s, r) => s + (r.minutosExtra ?? 0), 0)
+  const horasExtraStr = horasExtraMin >= 60 ? `${Math.floor(horasExtraMin / 60)}h ${horasExtraMin % 60}m` : `${horasExtraMin}m`
+
+  // Calendario dinámico del mes actual
+  const firstWeekday = new Date(year, month, 1).getDay()
+  const offset = firstWeekday === 0 ? 6 : firstWeekday - 1
+  const registroMap = new Map<number, string>(registrosMes.map(r => [parseInt(r.fecha.split('-')[2]), r.estado]))
+  // Determina si el turno de hoy ya terminó para saber si mostrar ausente o "en turno"
+  const turnoEndHour = (() => {
+    const m = emp?.turno?.match(/(\d{1,2})-(\d{1,2})\s*$/)
+    return m ? parseInt(m[2]) : null
+  })()
+  const shiftOver = turnoEndHour !== null ? new Date().getHours() >= turnoEndHour : true
+
+  const calendarDays: [number, DayType][] = Array.from({ length: offset }, () => [0, 'empty' as DayType])
+  for (let d = 1; d <= lastDay; d++) {
+    const w = new Date(year, month, d).getDay()
+    const isWeekend = w === 0 || w === 6
+    if (isWeekend) calendarDays.push([d, 'gray'])
+    else if (registroMap.has(d)) calendarDays.push([d, estadoToDayType(registroMap.get(d)!)])
+    else if (d < todayNum) calendarDays.push([d, 'danger'])
+    else if (d === todayNum) calendarDays.push([d, shiftOver ? 'danger' : 'today'])
+    else calendarDays.push([d, 'future'])
+  }
 
   if (!emp) return <div style={{ padding: '24px 32px', color: '#8f8d84', fontSize: 14 }}>No se encontró tu legajo asociado. Avisá a RRHH.</div>
 
   return (
     <div style={{ padding: '24px 32px' }}>
       <div style={{ fontSize: 20, fontWeight: 600, marginBottom: 2 }}>Mi panel</div>
-      <div style={{ fontSize: 13, color: '#6b6b66', marginBottom: 20 }}>Abril 2025 — {emp.nombre}</div>
+      <div style={{ fontSize: 13, color: '#6b6b66', marginBottom: 20 }}>{mesLabel} — {emp.nombre}</div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '260px 1fr', gap: 16, alignItems: 'start' }}>
         <div>
@@ -324,19 +375,19 @@ export function MiPanel() {
 
         <div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 10, marginBottom: 16 }}>
-            <MetricCard label="Días trabajados" value={17} sub="de 20 laborables" valueColor="success" />
-            <MetricCard label="Tardanzas" value={3} sub="42 min acumulados" valueColor="warn" />
-            <MetricCard label="Ausencias" value={2} sub="1 justificada" valueColor="danger" />
-            <MetricCard label="Horas extra" value="4h 15m" sub="al 50%" valueColor="info" />
+            <MetricCard label="Días trabajados" value={diasTrabajados} sub={`de ${diasLaborables} laborables`} valueColor="success" />
+            <MetricCard label="Tardanzas" value={tardanzasCount} sub={`${tardanzasMin} min acumulados`} valueColor="warn" />
+            <MetricCard label="Ausencias" value={ausenciasCount} sub={`${ausenciasJust} justificada${ausenciasJust !== 1 ? 's' : ''}`} valueColor="danger" />
+            <MetricCard label="Horas extra" value={horasExtraStr} sub="acumuladas" valueColor="info" />
           </div>
 
           <div style={{ background: '#fff', border: '1px solid #e2e0d8', borderRadius: 12, padding: 18, marginBottom: 16 }}>
-            <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 14 }}>Mi asistencia — Abril 2025</div>
+            <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 14 }}>Mi asistencia — {mesLabel}</div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: 4 }}>
               {['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'].map(d => (
                 <div key={d} style={{ fontSize: 11, color: '#888780', textAlign: 'center', padding: '3px 0', fontWeight: 600 }}>{d}</div>
               ))}
-              {abril2025.map(([day, type], i) => (
+              {calendarDays.map(([day, type], i) => (
                 <div key={i} style={{
                   fontSize: 12, textAlign: 'center', padding: '6px 2px', borderRadius: 6,
                   background: dayStyle[type].bg, color: dayStyle[type].color,
@@ -347,7 +398,7 @@ export function MiPanel() {
               ))}
             </div>
             <div style={{ display: 'flex', gap: 12, marginTop: 10, flexWrap: 'wrap' }}>
-              {[['#dcfce7', 'Presente'], ['#fef3c7', 'Tardanza'], ['#fee2e2', 'Ausente'], ['#dbeafe', 'H. Extra'], ['#f0ede6', 'No laborable']].map(([bg, label]) => (
+              {[['#dcfce7', 'Presente'], ['#fef3c7', 'Tardanza'], ['#fee2e2', 'Ausente'], ['#dbeafe', 'H. Extra'], ['#f0ede6', 'No laborable'], ['#faf5ff', 'Hoy']].map(([bg, label]) => (
                 <span key={label} style={{ fontSize: 11, display: 'flex', alignItems: 'center', gap: 4, color: '#6b6b66' }}>
                   <span style={{ width: 10, height: 10, borderRadius: 2, background: bg, display: 'inline-block' }} />
                   {label}
