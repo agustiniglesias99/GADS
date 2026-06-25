@@ -211,7 +211,7 @@ function FichajeModal({ emp, fecha, onClose, onDone }: {
         ) : scanning ? (
           <>
             <Suspense fallback={<div style={{ textAlign: 'center', padding: '24px 0', fontSize: 13, color: '#6b6b66' }}>Cargando cámara…</div>}>
-              <QRScanner onScan={procesar} onError={msg => { setScanning(false); setError(msg) }} />
+              <QRScanner onScan={procesar} onError={() => undefined} />
             </Suspense>
             <div style={{ fontSize: 12, color: '#888780', textAlign: 'center', margin: '12px 0 6px' }}>¿Sin cámara? Ingresá el código del QR</div>
             <div style={{ display: 'flex', gap: 8 }}>

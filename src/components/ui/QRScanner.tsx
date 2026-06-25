@@ -91,7 +91,7 @@ export function QRScanner({ onScan, onError }: Props) {
       let msg = 'No se pudo acceder a la cámara.'
       if (e instanceof Error) {
         if (e.name === 'NotAllowedError' || e.name === 'PermissionDeniedError') {
-          msg = 'Permiso de cámara denegado. Ir a Ajustes → Safari → Cámara y permitir el acceso.'
+          msg = 'Permiso de cámara denegado. Habilitá el acceso desde la barra de direcciones de tu navegador o desde los ajustes del sitio.'
         } else if (e.name === 'NotFoundError' || e.name === 'DevicesNotFoundError') {
           msg = 'No se encontró cámara en el dispositivo.'
         } else if (e.name === 'NotReadableError' || e.name === 'TrackStartError') {
