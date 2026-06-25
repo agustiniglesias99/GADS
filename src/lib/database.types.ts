@@ -19,7 +19,7 @@ type EstadoNovedad = 'pendiente' | 'aprobada' | 'rechazada' | 'justificada'
 type OrigenFichada = 'biometrico' | 'qr' | 'manual' | 'api'
 type EstadoRegistro =
   | 'presente' | 'ausente' | 'tardanza' | 'anomalia'
-  | 'hora_extra' | 'sin_descanso' | 'salida_anticipada'
+  | 'hora_extra' | 'sin_descanso' | 'salida_anticipada' | 'ausencia_justificada'
 type EstadoCierre = 'abierto' | 'cerrado'
 type EstadoResumen = 'listo' | 'pendiente'
 

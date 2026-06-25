@@ -52,7 +52,7 @@ export interface RegistroDia {
   descansoInicio?: string
   descansoFin?: string
   salida?: string
-  estado: 'presente' | 'ausente' | 'tardanza' | 'anomalia' | 'hora_extra' | 'sin_descanso' | 'salida_anticipada'
+  estado: 'presente' | 'ausente' | 'tardanza' | 'anomalia' | 'hora_extra' | 'sin_descanso' | 'salida_anticipada' | 'ausencia_justificada'
   origen: OrigenFichada
   minutosExtra?: number
   minutosTardanza?: number
