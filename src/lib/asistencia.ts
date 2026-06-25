@@ -17,6 +17,29 @@ type EstadoRegistro = RegistroDia['estado']
 // Token que debe codificar el QR del punto de fichaje. Configurable por env.
 export const QR_CHECKIN_TOKEN = (import.meta.env.VITE_QR_TOKEN ?? 'GADS-CHECKIN').trim()
 
+/** Genera el token dinámico del QR: "arcade-YYYY-MM-DD-HH-MM" */
+export function generateQRToken(d: Date = new Date()): string {
+  const y = d.getFullYear()
+  const mo = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  const h = String(d.getHours()).padStart(2, '0')
+  const m = String(d.getMinutes()).padStart(2, '0')
+  return `arcade-${y}-${mo}-${day}-${h}-${m}`
+}
+
+/**
+ * Valida un texto escaneado: acepta el token del minuto actual y el anterior
+ * para cubrir el caso borde donde el QR se genera al final de un minuto
+ * y se escanea al inicio del siguiente.
+ */
+export function isQRTokenValid(text: string): boolean {
+  const now = new Date()
+  const current = generateQRToken(now)
+  const prev = generateQRToken(new Date(now.getTime() - 60_000))
+  const t = text.trim()
+  return t === current || t === prev
+}
+
 export interface TurnoHorario {
   inicioMin: number // minutos desde 00:00
   finMin: number
