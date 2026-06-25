@@ -59,21 +59,27 @@ const abril2025: [number, DayType][] = [
   [28, 'ok'], [29, 'ok'], [30, 'gray'],
 ]
 
-function SolicitudModal({ onClose, onSave }: { onClose: () => void; onSave: (n: Novedad) => void }) {
+function SolicitudModal({ onClose, onSave, empleadoNombre }: { onClose: () => void; onSave: (n: Novedad) => void; empleadoNombre: string }) {
   const { user } = useAuth()
   const [form, setForm] = useState({ tipo: 'vacaciones' as TipoNovedad, fechaDesde: '', fechaHasta: '', detalle: '' })
 
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState('')
+  const [fechaError, setFechaError] = useState('')
 
   async function handleSave() {
     if (!form.fechaDesde || !user?.empleadoId) return
+    if (form.fechaHasta && form.fechaHasta <= form.fechaDesde) {
+      setFechaError('La fecha hasta debe ser posterior a la fecha desde.')
+      return
+    }
+    setFechaError('')
     setSaving(true)
     setSaveError('')
     try {
       const created = await createNovedad({
         empleadoId: user.empleadoId,
-        empleadoNombre: user.nombre,
+        empleadoNombre: empleadoNombre,
         fecha: form.fechaDesde,
         tipo: form.tipo,
         detalle: form.detalle || `Desde ${form.fechaDesde}${form.fechaHasta ? ` hasta ${form.fechaHasta}` : ''}`,
@@ -103,16 +109,25 @@ function SolicitudModal({ onClose, onSave }: { onClose: () => void; onSave: (n: 
             <option value="ausencia_justificada">Ausencia justificada</option>
           </select>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}>
-          {[['Fecha desde', 'fechaDesde'], ['Fecha hasta', 'fechaHasta']].map(([label, field]) => (
-            <div key={field}>
-              <label style={{ fontSize: 12, color: '#6b6b66', display: 'block', marginBottom: 4 }}>{label}</label>
-              <input type="date" value={form[field as 'fechaDesde' | 'fechaHasta']}
-                onChange={e => setForm(f => ({ ...f, [field]: e.target.value }))}
-                style={{ width: '100%', fontSize: 13, padding: '7px 10px', borderRadius: 8, border: '1px solid #d4d2ca' }} />
-            </div>
-          ))}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: fechaError ? 4 : 12 }}>
+          <div>
+            <label style={{ fontSize: 12, color: '#6b6b66', display: 'block', marginBottom: 4 }}>Fecha desde</label>
+            <input type="date" value={form.fechaDesde}
+              onChange={e => { setForm(f => ({ ...f, fechaDesde: e.target.value })); setFechaError('') }}
+              max={form.fechaHasta || undefined}
+              style={{ width: '100%', fontSize: 13, padding: '7px 10px', borderRadius: 8, border: `1px solid ${fechaError ? '#e53e3e' : '#d4d2ca'}` }} />
+          </div>
+          <div>
+            <label style={{ fontSize: 12, color: '#6b6b66', display: 'block', marginBottom: 4 }}>Fecha hasta</label>
+            <input type="date" value={form.fechaHasta}
+              onChange={e => { setForm(f => ({ ...f, fechaHasta: e.target.value })); setFechaError('') }}
+              min={form.fechaDesde || undefined}
+              style={{ width: '100%', fontSize: 13, padding: '7px 10px', borderRadius: 8, border: `1px solid ${fechaError ? '#e53e3e' : '#d4d2ca'}` }} />
+          </div>
         </div>
+        {fechaError && (
+          <div style={{ fontSize: 12, color: '#e53e3e', marginBottom: 12 }}>{fechaError}</div>
+        )}
         <div style={{ marginBottom: 16 }}>
           <label style={{ fontSize: 12, color: '#6b6b66', display: 'block', marginBottom: 4 }}>Motivo (opcional)</label>
           <textarea value={form.detalle} onChange={e => setForm(f => ({ ...f, detalle: e.target.value }))} rows={3}
@@ -376,6 +391,7 @@ export function MiPanel() {
         <SolicitudModal
           onClose={() => setShowModal(false)}
           onSave={n => { setData(d => ({ ...d!, novedades: [n, ...(d?.novedades ?? [])] })); setShowModal(false) }}
+          empleadoNombre={emp.nombre}
         />
       )}
       {showFichaje && emp && (
