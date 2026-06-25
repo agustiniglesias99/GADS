@@ -245,8 +245,6 @@ export function Fichadas() {
               <div>
                 {[
                   { hora: selectedEmpleado.entrada, label: 'Entrada', sub: selectedEmpleado.minutosTardanza ? `Tardanza ${selectedEmpleado.minutosTardanza} min` : 'En horario', color: selectedEmpleado.minutosTardanza ? '#dc2626' : '#15803d' },
-                  selectedEmpleado.descansoInicio ? { hora: selectedEmpleado.descansoInicio, label: 'Inicio descanso', sub: 'Registrado', color: '#d97706' } : null,
-                  selectedEmpleado.descansoFin ? { hora: selectedEmpleado.descansoFin, label: 'Fin descanso', sub: 'OK', color: '#d97706' } : null,
                   selectedEmpleado.salida ? { hora: selectedEmpleado.salida, label: 'Salida', sub: selectedEmpleado.minutosExtra ? `${selectedEmpleado.minutosExtra} min extra` : 'En horario', color: '#15803d' } : null,
                 ].filter(Boolean).map((item, i, arr) => (
                   <div key={i} style={{ display: 'flex', alignItems: 'stretch', gap: 0 }}>
