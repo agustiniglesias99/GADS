@@ -5,8 +5,8 @@ import { Badge } from '../../components/ui/Badge'
 import { Button } from '../../components/ui/Button'
 import { Loading, ErrorBox } from '../../components/ui/States'
 import { useQuery } from '../../lib/useQuery'
-import { fetchCierres, fetchResumen, fetchNovedades, updateCierreEstado } from '../../lib/api'
-import type { ResumenEmpleado } from '../../types'
+import { fetchCierres, fetchEmpleados, fetchNovedades, fetchRegistros, updateCierreEstado } from '../../lib/api'
+import type { Empleado, Novedad, RegistroDia, ResumenEmpleado } from '../../types'
 
 const fmtMin = (m: number) => (m ? `${Math.floor(m / 60)}h ${m % 60}m` : '—')
 
@@ -14,6 +14,43 @@ const MESES_ES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agos
 function fechaToMesPeriodo(fecha: string) {
   const [y, m] = fecha.split('-')
   return `${MESES_ES[parseInt(m) - 1]} ${y}`
+}
+
+function calcularResumen(
+  empleados: Empleado[],
+  novedades: Novedad[],
+  registros: RegistroDia[],
+  periodo: string,
+): ResumenEmpleado[] {
+  if (!periodo) return []
+  const novsPeriodo = novedades.filter(n => fechaToMesPeriodo(n.fecha) === periodo)
+  const regsPeriodo = registros.filter(r => fechaToMesPeriodo(r.fecha) === periodo)
+  const empIds = new Set([...novsPeriodo.map(n => n.empleadoId), ...regsPeriodo.map(r => r.empleadoId)])
+  return empleados
+    .filter(e => empIds.has(e.id))
+    .map(emp => {
+      const novs = novsPeriodo.filter(n => n.empleadoId === emp.id)
+      const regs = regsPeriodo.filter(r => r.empleadoId === emp.id)
+      const novAprobadas = novs.filter(n => n.estado === 'aprobada')
+      const fechasExtra50 = new Set(novAprobadas.filter(n => n.tipo === 'hora_extra_50').map(n => n.fecha))
+      const fechasExtra100 = new Set(novAprobadas.filter(n => n.tipo === 'hora_extra_100').map(n => n.fecha))
+      return {
+        empleadoId: emp.id,
+        nombre: emp.nombre,
+        legajo: emp.legajo,
+        dni: emp.dni,
+        cuil: emp.cuil,
+        diasTrabajados: regs.filter(r => r.entrada && r.estado !== 'ausente').length,
+        ausenciasJustificadas: novAprobadas.filter(n => n.tipo === 'ausencia_justificada').length,
+        ausenciasInjustificadas: novAprobadas.filter(n => n.tipo === 'ausencia_injustificada').length,
+        tardanzasMin: regs.reduce((s, r) => s + (r.minutosTardanza ?? 0), 0),
+        horasExtra50: regs.filter(r => fechasExtra50.has(r.fecha)).reduce((s, r) => s + (r.minutosExtra ?? 0), 0),
+        horasExtra100: regs.filter(r => fechasExtra100.has(r.fecha)).reduce((s, r) => s + (r.minutosExtra ?? 0), 0),
+        licencias: novAprobadas.filter(n => n.tipo === 'licencia').length,
+        vacaciones: novAprobadas.filter(n => n.tipo === 'vacaciones').length,
+        estado: novs.some(n => n.estado === 'pendiente') ? 'pendiente' : 'listo',
+      }
+    })
 }
 
 function ResumenModal({ resumen, onClose }: { resumen: ResumenEmpleado; onClose: () => void }) {
@@ -54,10 +91,10 @@ function ResumenModal({ resumen, onClose }: { resumen: ResumenEmpleado; onClose:
 
 export function CierreMensual() {
   const { data, loading, error, reload } = useQuery(async () => {
-    const [cierres, resumen, novedades] = await Promise.all([
-      fetchCierres(), fetchResumen(), fetchNovedades(),
+    const [cierres, empleados, novedades, registros] = await Promise.all([
+      fetchCierres(), fetchEmpleados(), fetchNovedades(), fetchRegistros(),
     ])
-    return { cierres, resumen, novedades }
+    return { cierres, empleados, novedades, registros }
   }, [])
   const [periodo, setPeriodo] = useState('')
   const [selectedResumen, setSelectedResumen] = useState<ResumenEmpleado | null>(null)
@@ -67,11 +104,11 @@ export function CierreMensual() {
   if (error) return <div style={{ padding: '24px 32px' }}><ErrorBox message={error} onRetry={reload} /></div>
 
   const cierresMensuales = data!.cierres
-  const resumenEmpleados = data!.resumen
   const novedades = data!.novedades
   const mesActual = `${MESES_ES[new Date().getMonth()]} ${new Date().getFullYear()}`
   const periodos = cierresMensuales.map(c => c.periodo)
   const periodoActivo = periodo || (periodos.includes(mesActual) ? mesActual : cierresMensuales[cierresMensuales.length - 1]?.periodo) || ''
+  const resumenEmpleados = calcularResumen(data!.empleados, novedades, data!.registros, periodoActivo)
   const cierre = cierresMensuales.find(c => c.periodo === periodoActivo) ?? cierresMensuales[0]
   const pendientes = novedades.filter(n => n.estado === 'pendiente' && fechaToMesPeriodo(n.fecha) === periodoActivo).length
 

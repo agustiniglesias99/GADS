@@ -97,7 +97,11 @@ export function Dashboard({ onNavigate }: Props) {
   // --- Novedades del mes ---
   const novedadesDelMes = novedadesData.filter(n => fechaToMesPeriodo(n.fecha) === periodoActivo)
   const pendientes      = novedadesDelMes.filter(n => n.estado === 'pendiente')
-  const ultimasNovedades = [...novedadesDelMes].sort((a, b) => b.fecha.localeCompare(a.fecha)).slice(0, 5)
+  const ultimasNovedades = [...novedadesDelMes].sort((a, b) => {
+    const pa = a.estado === 'pendiente' ? 0 : 1
+    const pb = b.estado === 'pendiente' ? 0 : 1
+    return pa !== pb ? pa - pb : b.fecha.localeCompare(a.fecha)
+  }).slice(0, 5)
 
   // --- Fichadas: last date with data in the period (today if current month) ---
   const registrosPeriodo = registrosDia.filter(r => r.fecha >= primerDiaMes && r.fecha <= ultimoDiaMes)
