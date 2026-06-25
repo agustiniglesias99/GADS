@@ -1,4 +1,5 @@
 import { useState, lazy, Suspense } from 'react'
+import { createPortal } from 'react-dom'
 import { MetricCard } from '../../components/ui/MetricCard'
 import { Badge } from '../../components/ui/Badge'
 import { Button } from '../../components/ui/Button'
@@ -87,7 +88,7 @@ function SolicitudModal({ onClose, onSave }: { onClose: () => void; onSave: (n: 
     }
   }
 
-  return (
+  return createPortal(
     <div className="modal-overlay" style={{ position: 'fixed', inset: 0, background: 'rgba(26,24,20,0.38)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200, padding: 20 }}
       onClick={onClose}>
       <div className="modal-card" style={{ background: '#fff', borderRadius: 16, padding: 24, width: 440, boxShadow: 'var(--shadow-lg)', border: '1px solid var(--border)' }} onClick={e => e.stopPropagation()}>
@@ -125,7 +126,8 @@ function SolicitudModal({ onClose, onSave }: { onClose: () => void; onSave: (n: 
           <Button variant="primary" onClick={handleSave} disabled={!form.fechaDesde || saving}>{saving ? 'Enviando…' : 'Enviar solicitud'}</Button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
 
@@ -166,7 +168,7 @@ function FichajeModal({ emp, fecha, onClose, onDone }: {
     setScanning(true)
   }
 
-  return (
+  return createPortal(
     <div className="modal-overlay" style={{ position: 'fixed', inset: 0, background: 'rgba(26,24,20,0.38)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200, padding: 20 }}
       onClick={onClose}>
       <div className="modal-card" style={{ background: '#fff', borderRadius: 16, padding: 24, width: 380, boxShadow: 'var(--shadow-lg)', border: '1px solid var(--border)' }} onClick={e => e.stopPropagation()}>
@@ -209,7 +211,8 @@ function FichajeModal({ emp, fecha, onClose, onDone }: {
           <Button onClick={onClose}>{result ? 'Listo' : 'Cancelar'}</Button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
 
