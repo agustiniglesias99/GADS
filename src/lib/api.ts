@@ -99,6 +99,13 @@ export async function fetchRegistrosMes(empleadoId: string, desde: string, hasta
   return unwrap(res).map(toRegistro)
 }
 
+export async function fetchRegistrosRango(desde: string, hasta: string): Promise<RegistroDia[]> {
+  const res = await supabase.from('registros_dia').select('*')
+    .gte('fecha', desde).lte('fecha', hasta)
+    .order('fecha', { ascending: true })
+  return unwrap(res).map(toRegistro)
+}
+
 export async function fetchRegistroDia(empleadoId: string, fecha: string): Promise<RegistroDia | null> {
   const res = await supabase.from('registros_dia').select('*')
     .eq('empleado_id', empleadoId).eq('fecha', fecha).maybeSingle()

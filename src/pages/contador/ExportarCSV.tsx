@@ -4,7 +4,7 @@ import { Badge } from '../../components/ui/Badge'
 import { MetricCard } from '../../components/ui/MetricCard'
 import { Loading, ErrorBox } from '../../components/ui/States'
 import { useQuery } from '../../lib/useQuery'
-import { fetchResumen, fetchNovedades } from '../../lib/api'
+import { fetchEmpleados, fetchNovedades, fetchRegistrosRango } from '../../lib/api'
 import type { TipoNovedad, ResumenEmpleado, Novedad } from '../../types'
 
 const tipoLabel: Record<TipoNovedad, string> = {
@@ -21,8 +21,8 @@ const tipoLabel: Record<TipoNovedad, string> = {
 
 export function ExportarCSV() {
   const { data, loading, error, reload } = useQuery(async () => {
-    const [resumen, novedades] = await Promise.all([fetchResumen(), fetchNovedades()])
-    return { resumen, novedades: novedades.filter(n => n.estado === 'aprobada') }
+    const [novedades, empleados] = await Promise.all([fetchNovedades(), fetchEmpleados()])
+    return { novedades: novedades.filter(n => n.estado === 'aprobada'), empleados }
   }, [])
 
   const [fechaDesde, setFechaDesde] = useState(() => {
@@ -37,19 +37,52 @@ export function ExportarCSV() {
   const [novedadesFiltradas, setNovedadesFiltradas] = useState<Novedad[]>([])
   const [hasSearched, setHasSearched] = useState(false)
   const [fechaError, setFechaError] = useState('')
+  const [calculando, setCalculando] = useState(false)
 
-  function handleFilter() {
+  async function handleFilter() {
     if (fechaDesde > fechaHasta) {
       setFechaError('La fecha desde no puede ser mayor que la fecha hasta.')
       return
     }
     setFechaError('')
-    const resumen = data?.resumen ?? []
-    const novsFiltradas = (data?.novedades ?? []).filter(n => n.fecha >= fechaDesde && n.fecha <= fechaHasta)
-    setNovedadesFiltradas(novsFiltradas)
-    const empleadosConNovedad = new Set(novsFiltradas.map(n => n.empleadoId))
-    setFiltered(resumen.filter(r => empleadosConNovedad.has(r.empleadoId) || r.diasTrabajados > 0))
-    setHasSearched(true)
+    setCalculando(true)
+    try {
+      const registros = await fetchRegistrosRango(fechaDesde, fechaHasta)
+      const novsFiltradas = (data?.novedades ?? []).filter(n => n.fecha >= fechaDesde && n.fecha <= fechaHasta)
+      setNovedadesFiltradas(novsFiltradas)
+
+      const empleados = data?.empleados ?? []
+      const resumenComputado: ResumenEmpleado[] = empleados
+        .flatMap(emp => {
+          const regs = registros.filter(r => r.empleadoId === emp.id)
+          const novs = novsFiltradas.filter(n => n.empleadoId === emp.id)
+          if (regs.length === 0 && novs.length === 0) return []
+          const item: ResumenEmpleado = {
+            empleadoId: emp.id,
+            nombre: emp.nombre,
+            legajo: emp.legajo,
+            dni: emp.dni,
+            cuil: emp.cuil,
+            estado: 'listo',
+            diasTrabajados: regs.filter(r => r.estado !== 'ausente' && r.estado !== 'ausencia_justificada').length,
+            ausenciasJustificadas: regs.filter(r => r.estado === 'ausencia_justificada').length,
+            ausenciasInjustificadas: regs.filter(r => r.estado === 'ausente').length,
+            tardanzasMin: regs.reduce((s, r) => s + (r.minutosTardanza ?? 0), 0),
+            horasExtra50: regs.reduce((s, r) => s + (r.minutosExtra ?? 0), 0),
+            horasExtra100: 0,
+            licencias: novs.filter(n => n.tipo === 'licencia').length,
+            vacaciones: novs.filter(n => n.tipo === 'vacaciones').length,
+          }
+          return [item]
+        })
+
+      setFiltered(resumenComputado)
+      setHasSearched(true)
+    } catch {
+      setFechaError('Error al cargar los registros. Intentá de nuevo.')
+    } finally {
+      setCalculando(false)
+    }
   }
 
   function handleDownload() {
@@ -78,7 +111,7 @@ export function ExportarCSV() {
   function handleDownloadDetalle() {
     const headers = ['Legajo', 'Empleado', 'Fecha', 'Tipo', 'Detalle', 'Origen', 'Estado']
     const rows = novedadesFiltradas.map(n => {
-      const emp = (data?.resumen ?? []).find(r => r.empleadoId === n.empleadoId)
+      const emp = filtered.find(r => r.empleadoId === n.empleadoId)
       return [emp?.legajo ?? '', n.empleadoNombre, n.fecha, tipoLabel[n.tipo], n.detalle, n.origen, n.estado]
     })
     const csv = [headers, ...rows].map(row => row.map(cell => `"${cell}"`).join(',')).join('\n')
@@ -116,7 +149,9 @@ export function ExportarCSV() {
               min={fechaDesde}
               style={{ fontSize: 13, padding: '7px 10px', borderRadius: 8, border: `1px solid ${fechaError ? '#e53e3e' : '#d4d2ca'}` }} />
           </div>
-          <Button variant="primary" onClick={handleFilter}>Filtrar</Button>
+          <Button variant="primary" onClick={() => { void handleFilter() }} disabled={calculando}>
+            {calculando ? 'Filtrando…' : 'Filtrar'}
+          </Button>
         </div>
         {fechaError && (
           <div style={{ marginTop: 8, fontSize: 12, color: '#e53e3e' }}>{fechaError}</div>
