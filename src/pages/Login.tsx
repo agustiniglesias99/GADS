@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { Button } from '../components/ui/Button'
+import { QRDisplay } from '../components/ui/QRDisplay'
 
 const demoHints = [
   { icon: '🏢', label: 'RRHH Administrativo', email: 'rrhh@arcade.com' },
@@ -14,6 +15,7 @@ export function Login() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  const [showQR, setShowQR] = useState(false)
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -115,7 +117,18 @@ export function Login() {
           </div>
           <div style={{ fontSize: 11, color: '#8f8d84', marginTop: 8 }}>Tocá una cuenta para autocompletar el email. Usá la contraseña que definiste en Supabase.</div>
         </div>
+
+        <button
+          type="button"
+          onClick={() => setShowQR(true)}
+          style={{ marginTop: 12, width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '10px 14px', borderRadius: 12, border: '1px solid var(--border)', background: 'rgba(255,255,255,0.6)', cursor: 'pointer', fontSize: 13, color: '#1a1a18', fontWeight: 500 }}
+        >
+          <span style={{ fontSize: 18 }}>📷</span>
+          Punto de fichaje — Mostrar QR
+        </button>
       </div>
+
+      {showQR && <QRDisplay onClose={() => setShowQR(false)} />}
     </div>
   )
 }

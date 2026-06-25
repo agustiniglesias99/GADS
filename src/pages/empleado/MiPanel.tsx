@@ -9,7 +9,7 @@ import { Loading, ErrorBox } from '../../components/ui/States'
 const QRScanner = lazy(() => import('../../components/ui/QRScanner').then(m => ({ default: m.QRScanner })))
 import { useQuery } from '../../lib/useQuery'
 import { fetchEmpleado, fetchNovedadesByEmpleado, createNovedad, fetchRegistroDia, registrarFichada, type FichadaResult } from '../../lib/api'
-import { QR_CHECKIN_TOKEN, fechaHoy } from '../../lib/asistencia'
+import { isQRTokenValid, fechaHoy } from '../../lib/asistencia'
 import { useAuth } from '../../context/AuthContext'
 import type { BadgeVariant, EstadoNovedad, TipoNovedad, Novedad, Empleado, RegistroDia } from '../../types'
 
@@ -160,8 +160,8 @@ function FichajeModal({ emp, fecha, onClose, onDone }: {
 
   async function procesar(text: string) {
     setScanning(false)
-    if (text.trim() !== QR_CHECKIN_TOKEN) {
-      setError('QR inválido. Escaneá el código del punto de fichaje.')
+    if (!isQRTokenValid(text)) {
+      setError('QR inválido o expirado. Pedí que actualicen el código en el punto de fichaje y volvé a escanear.')
       return
     }
     setSaving(true)
@@ -215,7 +215,7 @@ function FichajeModal({ emp, fecha, onClose, onDone }: {
             </Suspense>
             <div style={{ fontSize: 12, color: '#888780', textAlign: 'center', margin: '12px 0 6px' }}>¿Sin cámara? Ingresá el código del QR</div>
             <div style={{ display: 'flex', gap: 8 }}>
-              <input type="text" value={manual} onChange={e => setManual(e.target.value)} placeholder={QR_CHECKIN_TOKEN}
+              <input type="text" value={manual} onChange={e => setManual(e.target.value)} placeholder="arcade-YYYY-MM-DD-HH-MM"
                 style={{ flex: 1, fontSize: 13, padding: '7px 10px', borderRadius: 8, border: '1px solid #d4d2ca' }} />
               <Button onClick={() => procesar(manual)} disabled={!manual.trim()}>Usar</Button>
             </div>
