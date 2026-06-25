@@ -10,6 +10,7 @@ import type { BadgeVariant, RegistroDia } from '../../types'
 const estadoBadge: Record<string, BadgeVariant> = {
   presente: 'success',
   ausente: 'danger',
+  ausencia_justificada: 'info',
   tardanza: 'warn',
   anomalia: 'danger',
   hora_extra: 'info',
@@ -20,6 +21,7 @@ const estadoBadge: Record<string, BadgeVariant> = {
 const estadoLabel: Record<string, string> = {
   presente: 'Presente',
   ausente: 'Ausente',
+  ausencia_justificada: 'Aus. justificada',
   tardanza: 'Tardanza',
   anomalia: 'Anomalía',
   hora_extra: 'H. Extra',
@@ -114,15 +116,18 @@ export function Fichadas() {
     setActionLoading(true)
     try {
       const nombre = empleados.find(e => e.id === selectedEmpleado.empleadoId)?.nombre ?? selectedEmpleado.empleadoId
-      await createNovedad({
-        empleadoId: selectedEmpleado.empleadoId,
-        empleadoNombre: nombre,
-        fecha: selectedEmpleado.fecha,
-        tipo: 'ausencia_justificada',
-        detalle: 'Justificada por RRHH',
-        origen: 'manual',
-        estado: 'aprobada',
-      })
+      await Promise.all([
+        createNovedad({
+          empleadoId: selectedEmpleado.empleadoId,
+          empleadoNombre: nombre,
+          fecha: selectedEmpleado.fecha,
+          tipo: 'ausencia_justificada',
+          detalle: 'Justificada por RRHH',
+          origen: 'manual',
+          estado: 'aprobada',
+        }),
+        updateRegistroEstado(selectedEmpleado.empleadoId, selectedEmpleado.fecha, 'ausencia_justificada'),
+      ])
       closeModal()
       reload()
     } catch (e) {
@@ -180,6 +185,7 @@ export function Fichadas() {
           <option value="todos">Todos los estados</option>
           <option value="presente">Presente</option>
           <option value="ausente">Ausente</option>
+          <option value="ausencia_justificada">Aus. justificada</option>
           <option value="tardanza">Tardanza</option>
           <option value="anomalia">Anomalía</option>
           <option value="hora_extra">H. Extra</option>
@@ -223,7 +229,7 @@ export function Fichadas() {
                     </span>
                   </td>
                   <td style={{ padding: '9px 0', borderBottom: '1px solid #f0ede6' }}>
-                    <Button variant="sm" onClick={e => { e.stopPropagation(); setSelectedEmpleado(r);  setModalOpen(true)}}> 
+                    <Button variant="sm" onClick={e => { e.stopPropagation(); setSelectedEmpleado(r); setModalOpen(true) }}>
                       {r.estado === 'anomalia' ? 'Resolver' : r.estado === 'ausente' ? 'Justificar' : 'Ver'}
                     </Button>
                   </td>
@@ -295,7 +301,11 @@ export function Fichadas() {
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
               <Button onClick={() => setModalOpen(false)}>Cerrar</Button>
-              {selectedEmpleado.estado === 'ausente' && <Button variant="primary" onClick={justificarAusencia} disabled={actionLoading}>{actionLoading ? 'Procesando…' : 'Justificar ausencia'}</Button>}
+              {selectedEmpleado.estado === 'ausente' && (
+                <Button variant="primary" onClick={justificarAusencia} disabled={actionLoading}>
+                  {actionLoading ? 'Procesando…' : 'Justificar ausencia'}
+                </Button>
+              )}
               {selectedEmpleado.estado === 'anomalia' && <Button variant="primary" onClick={resolverAnomalia} disabled={actionLoading}>{actionLoading ? 'Procesando…' : 'Resolver anomalía'}</Button>}
             </div>
           </div>
