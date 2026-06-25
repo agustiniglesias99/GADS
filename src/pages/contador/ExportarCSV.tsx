@@ -30,8 +30,14 @@ export function ExportarCSV() {
   const [filtered, setFiltered] = useState<ResumenEmpleado[]>([])
   const [novedadesFiltradas, setNovedadesFiltradas] = useState<Novedad[]>([])
   const [hasSearched, setHasSearched] = useState(false)
+  const [fechaError, setFechaError] = useState('')
 
   function handleFilter() {
+    if (fechaDesde >= fechaHasta) {
+      setFechaError('La fecha desde debe ser anterior a la fecha hasta.')
+      return
+    }
+    setFechaError('')
     const resumen = data?.resumen ?? []
     const novsFiltradas = (data?.novedades ?? []).filter(n => n.fecha >= fechaDesde && n.fecha <= fechaHasta)
     setNovedadesFiltradas(novsFiltradas)
@@ -90,15 +96,25 @@ export function ExportarCSV() {
       <div style={{ background: '#fff', border: '1px solid #e2e0d8', borderRadius: 12, padding: 24, marginBottom: 16 }}>
         <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 16 }}>Filtrar período</div>
         <div style={{ display: 'flex', gap: 16, alignItems: 'flex-end', flexWrap: 'wrap' }}>
-          {[['Fecha desde', fechaDesde, setFechaDesde] as const, ['Fecha hasta', fechaHasta, setFechaHasta] as const].map(([label, value, setter]) => (
-            <div key={label}>
-              <label style={{ fontSize: 12, color: '#6b6b66', display: 'block', marginBottom: 6 }}>{label}</label>
-              <input type="date" value={value} onChange={e => setter(e.target.value)}
-                style={{ fontSize: 13, padding: '7px 10px', borderRadius: 8, border: '1px solid #d4d2ca' }} />
-            </div>
-          ))}
+          <div>
+            <label style={{ fontSize: 12, color: '#6b6b66', display: 'block', marginBottom: 6 }}>Fecha desde</label>
+            <input type="date" value={fechaDesde}
+              onChange={e => { setFechaDesde(e.target.value); setFechaError('') }}
+              max={fechaHasta}
+              style={{ fontSize: 13, padding: '7px 10px', borderRadius: 8, border: `1px solid ${fechaError ? '#e53e3e' : '#d4d2ca'}` }} />
+          </div>
+          <div>
+            <label style={{ fontSize: 12, color: '#6b6b66', display: 'block', marginBottom: 6 }}>Fecha hasta</label>
+            <input type="date" value={fechaHasta}
+              onChange={e => { setFechaHasta(e.target.value); setFechaError('') }}
+              min={fechaDesde}
+              style={{ fontSize: 13, padding: '7px 10px', borderRadius: 8, border: `1px solid ${fechaError ? '#e53e3e' : '#d4d2ca'}` }} />
+          </div>
           <Button variant="primary" onClick={handleFilter}>Filtrar</Button>
         </div>
+        {fechaError && (
+          <div style={{ marginTop: 8, fontSize: 12, color: '#e53e3e' }}>{fechaError}</div>
+        )}
       </div>
 
       {hasSearched && (
