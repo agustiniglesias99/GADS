@@ -69,8 +69,8 @@ function SolicitudModal({ onClose, onSave, empleadoNombre }: { onClose: () => vo
 
   async function handleSave() {
     if (!form.fechaDesde || !user?.empleadoId) return
-    if (form.fechaHasta && form.fechaHasta <= form.fechaDesde) {
-      setFechaError('La fecha hasta debe ser posterior a la fecha desde.')
+    if (form.fechaHasta && form.fechaHasta < form.fechaDesde) {
+      setFechaError('La fecha hasta no puede ser anterior a la fecha desde.')
       return
     }
     setFechaError('')
