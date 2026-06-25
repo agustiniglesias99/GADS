@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { createPortal } from 'react-dom'
 import { MetricCard } from '../../components/ui/MetricCard'
 import { Badge } from '../../components/ui/Badge'
 import { Button } from '../../components/ui/Button'
@@ -212,7 +213,7 @@ export function EmpleadoDetalle({ empleadoId, onBack }: Props) {
         </div>
       </div>
 
-      {selectedNov && (
+      {selectedNov && createPortal(
         <div className="modal-overlay" style={{ position: 'fixed', inset: 0, background: 'rgba(26,24,20,0.38)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200, padding: 20 }}
           onClick={() => setSelectedNov(null)}>
           <div className="modal-card" style={{ background: '#fff', borderRadius: 16, padding: 24, width: 420, boxShadow: 'var(--shadow-lg)', border: '1px solid var(--border)' }} onClick={e => e.stopPropagation()}>
@@ -232,7 +233,8 @@ export function EmpleadoDetalle({ empleadoId, onBack }: Props) {
               <Button onClick={() => setSelectedNov(null)}>Cerrar</Button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   )

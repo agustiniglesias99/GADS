@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { createPortal } from 'react-dom'
 import { Badge } from '../../components/ui/Badge'
 import { Button } from '../../components/ui/Button'
 import { MetricCard } from '../../components/ui/MetricCard'
@@ -42,7 +43,7 @@ interface ModalProps {
 }
 
 function NovédadModal({ novedad, onClose, onAprobar, onRechazar }: ModalProps) {
-  return (
+  return createPortal(
     <div className="modal-overlay" style={{ position: 'fixed', inset: 0, background: 'rgba(26,24,20,0.38)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200, padding: 20 }}
       onClick={onClose}>
       <div className="modal-card" style={{ background: '#fff', borderRadius: 16, padding: 24, width: 440, boxShadow: 'var(--shadow-lg)', border: '1px solid var(--border)' }} onClick={e => e.stopPropagation()}>
@@ -71,7 +72,8 @@ function NovédadModal({ novedad, onClose, onAprobar, onRechazar }: ModalProps) 
           )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
 
@@ -99,7 +101,7 @@ function NuevaNovedadModal({ onClose, onSave }: NuevaNovedadModalProps) {
       setSaving(false)
     }
   }
-  return (
+  return createPortal(
     <div className="modal-overlay" style={{ position: 'fixed', inset: 0, background: 'rgba(26,24,20,0.38)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200, padding: 20 }}
       onClick={onClose}>
       <div className="modal-card" style={{ background: '#fff', borderRadius: 16, padding: 24, width: 440, boxShadow: 'var(--shadow-lg)', border: '1px solid var(--border)' }} onClick={e => e.stopPropagation()}>
@@ -141,7 +143,8 @@ function NuevaNovedadModal({ onClose, onSave }: NuevaNovedadModalProps) {
           <Button variant="primary" onClick={handleSave} disabled={saving || !form.empleadoId}>{saving ? 'Guardando…' : 'Guardar'}</Button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
 
@@ -168,7 +171,8 @@ export function Novedades({ showNewModal, onCloseNewModal }: Props) {
       return toNum(ma, ya) - toNum(mb, yb)
     })
 
-  const periodoActivo = periodo || periodos[periodos.length - 1] || ''
+  const mesActual = `${MESES_ES[new Date().getMonth()]} ${new Date().getFullYear()}`
+  const periodoActivo = periodo || (periodos.includes(mesActual) ? mesActual : periodos[periodos.length - 1]) || ''
 
   const dataDelMes = data.filter(n => fechaToMesPeriodo(n.fecha) === periodoActivo)
 

@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { createPortal } from 'react-dom'
 import { Badge } from '../../components/ui/Badge'
 import { Button } from '../../components/ui/Button'
 import { Loading, ErrorBox } from '../../components/ui/States'
@@ -48,7 +49,7 @@ function NuevoEmpleadoModal({ onClose, onSave }: { onClose: () => void; onSave: 
 
   const inputStyle: React.CSSProperties = { width: '100%', fontSize: 13, padding: '7px 10px', borderRadius: 8, border: '1px solid #d4d2ca', boxSizing: 'border-box' }
 
-  return (
+  return createPortal(
     <div className="modal-overlay" style={{ position: 'fixed', inset: 0, background: 'rgba(26,24,20,0.38)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200, padding: 20 }}
       onClick={onClose}>
       <div className="modal-card" style={{ background: '#fff', borderRadius: 16, padding: 24, width: 520, maxHeight: '90vh', overflowY: 'auto', boxShadow: 'var(--shadow-lg)', border: '1px solid var(--border)' }} onClick={e => e.stopPropagation()}>
@@ -94,7 +95,8 @@ function NuevoEmpleadoModal({ onClose, onSave }: { onClose: () => void; onSave: 
           <Button variant="primary" onClick={handleSave} disabled={saving || !canSave}>{saving ? 'Guardando…' : 'Crear empleado'}</Button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
 

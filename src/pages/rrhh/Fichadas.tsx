@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { createPortal } from 'react-dom'
 import { MetricCard } from '../../components/ui/MetricCard'
 import { Badge } from '../../components/ui/Badge'
 import { Button } from '../../components/ui/Button'
@@ -286,7 +287,7 @@ export function Fichadas() {
       </>
       )}
 
-      {modalOpen && selectedEmpleado && (
+      {modalOpen && selectedEmpleado && createPortal(
         <div className="modal-overlay" style={{ position: 'fixed', inset: 0, background: 'rgba(26,24,20,0.38)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200, padding: 20 }}
           onClick={() => setModalOpen(false)}>
           <div className="modal-card" style={{ background: '#fff', borderRadius: 16, padding: 24, width: 400, boxShadow: 'var(--shadow-lg)', border: '1px solid var(--border)' }} onClick={e => e.stopPropagation()}>
@@ -309,7 +310,8 @@ export function Fichadas() {
               {selectedEmpleado.estado === 'anomalia' && <Button variant="primary" onClick={resolverAnomalia} disabled={actionLoading}>{actionLoading ? 'Procesando…' : 'Resolver anomalía'}</Button>}
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   )
