@@ -4,8 +4,10 @@ import { MetricCard } from '../../components/ui/MetricCard'
 import { Badge } from '../../components/ui/Badge'
 import { Button } from '../../components/ui/Button'
 import { Loading, ErrorBox } from '../../components/ui/States'
+import { EmpleadoFormModal } from '../../components/EmpleadoFormModal'
 import { useQuery } from '../../lib/useQuery'
-import { fetchEmpleado, fetchNovedadesByEmpleado, setNovedadEstado } from '../../lib/api'
+import { fetchEmpleado, fetchNovedadesByEmpleado, fetchRegistrosMes, setNovedadEstado } from '../../lib/api'
+import { fechaHoy } from '../../lib/asistencia'
 import type { BadgeVariant, EstadoNovedad, TipoNovedad, Novedad } from '../../types'
 
 const tipoLabel: Record<TipoNovedad, string> = {
@@ -27,7 +29,7 @@ const estadoBadge: Record<EstadoNovedad, BadgeVariant> = {
   justificada: 'info',
 }
 
-type DayType = 'ok' | 'warn' | 'danger' | 'info' | 'gray' | 'empty'
+type DayType = 'ok' | 'warn' | 'danger' | 'info' | 'gray' | 'empty' | 'future' | 'today'
 
 const dayStyle: Record<DayType, { bg: string; color: string }> = {
   ok:     { bg: '#dcfce7', color: '#166534' },
@@ -36,15 +38,23 @@ const dayStyle: Record<DayType, { bg: string; color: string }> = {
   info:   { bg: '#dbeafe', color: '#1e40af' },
   gray:   { bg: '#f0ede6', color: '#888780' },
   empty:  { bg: 'transparent', color: 'transparent' },
+  future: { bg: 'transparent', color: '#c4c2ba' },
+  today:  { bg: '#faf5ff', color: '#7c3aed' },
 }
 
-const abril2025: [number, DayType][] = [
-  [0, 'empty'], [1, 'ok'], [2, 'ok'], [3, 'ok'], [4, 'ok'], [5, 'gray'], [6, 'gray'],
-  [7, 'ok'], [8, 'ok'], [9, 'warn'], [10, 'ok'], [11, 'ok'], [12, 'gray'], [13, 'gray'],
-  [14, 'warn'], [15, 'danger'], [16, 'ok'], [17, 'ok'], [18, 'info'], [19, 'gray'], [20, 'gray'],
-  [21, 'ok'], [22, 'danger'], [23, 'ok'], [24, 'ok'], [25, 'ok'], [26, 'gray'], [27, 'gray'],
-  [28, 'ok'], [29, 'ok'], [30, 'gray'],
-]
+function estadoToDayType(estado: string): DayType {
+  switch (estado) {
+    case 'presente': return 'ok'
+    case 'tardanza': return 'warn'
+    case 'hora_extra': return 'info'
+    case 'sin_descanso': return 'warn'
+    case 'salida_anticipada': return 'warn'
+    case 'ausente': return 'danger'
+    case 'ausencia_justificada': return 'info'
+    case 'anomalia': return 'danger'
+    default: return 'gray'
+  }
+}
 
 interface Props {
   empleadoId: string
@@ -52,16 +62,44 @@ interface Props {
 }
 
 export function EmpleadoDetalle({ empleadoId, onBack }: Props) {
+  const hoy = fechaHoy()
+  const hoyDate = new Date(hoy + 'T12:00:00')
+  const year = hoyDate.getFullYear()
+  const month = hoyDate.getMonth()
+  const todayNum = hoyDate.getDate()
+  const mesLabel = hoyDate.toLocaleDateString('es-AR', { month: 'long', year: 'numeric' })
+  const lastDay = new Date(year, month + 1, 0).getDate()
+  const mesDesde = `${year}-${String(month + 1).padStart(2, '0')}-01`
+  const mesHasta = `${year}-${String(month + 1).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`
+
   const { data, loading, error, reload, setData } = useQuery(async () => {
-    const [emp, novedades] = await Promise.all([
+    const [emp, novedades, registrosMes] = await Promise.all([
       fetchEmpleado(empleadoId), fetchNovedadesByEmpleado(empleadoId),
+      fetchRegistrosMes(empleadoId, mesDesde, mesHasta),
     ])
-    return { emp, novedades }
+    return { emp, novedades, registrosMes }
   }, [empleadoId])
 
   const emp = data?.emp ?? null
   const novedadesData = data?.novedades ?? []
+  const registrosMes = data?.registrosMes ?? []
+
+  // Calendario dinámico del mes en curso
+  const firstWeekday = new Date(year, month, 1).getDay()
+  const offset = firstWeekday === 0 ? 6 : firstWeekday - 1
+  const registroMap = new Map<number, string>(registrosMes.map(r => [parseInt(r.fecha.split('-')[2]), r.estado]))
+  const calendarDays: [number, DayType][] = Array.from({ length: offset }, () => [0, 'empty' as DayType])
+  for (let d = 1; d <= lastDay; d++) {
+    const w = new Date(year, month, d).getDay()
+    const isWeekend = w === 0 || w === 6
+    if (isWeekend) calendarDays.push([d, 'gray'])
+    else if (registroMap.has(d)) calendarDays.push([d, estadoToDayType(registroMap.get(d)!)])
+    else if (d < todayNum) calendarDays.push([d, 'danger'])
+    else if (d === todayNum) calendarDays.push([d, 'today'])
+    else calendarDays.push([d, 'future'])
+  }
   const [selectedNov, setSelectedNov] = useState<Novedad | null>(null)
+  const [showEdit, setShowEdit] = useState(false)
 
   async function aprobar(id: string) {
     await setNovedadEstado(id, 'aprobada')
@@ -138,6 +176,7 @@ export function EmpleadoDetalle({ empleadoId, onBack }: Props) {
               </div>
             ))}
           </div>
+          <Button variant="primary" onClick={() => setShowEdit(true)} style={{ width: '100%', marginBottom: 8 }}>Editar empleado</Button>
           <Button onClick={handleExportResumen} style={{ width: '100%' }}>Exportar resumen</Button>
         </div>
 
@@ -150,16 +189,15 @@ export function EmpleadoDetalle({ empleadoId, onBack }: Props) {
           </div>
 
           <div style={{ background: '#fff', border: '1px solid #e2e0d8', borderRadius: 12, padding: 18, marginBottom: 16 }}>
-            <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 14 }}>Calendario de asistencia — Abril 2025</div>
+            <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 14 }}>Calendario de asistencia — {mesLabel.charAt(0).toUpperCase() + mesLabel.slice(1)}</div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: 4 }}>
               {['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'].map(d => (
                 <div key={d} style={{ fontSize: 11, color: '#888780', textAlign: 'center', padding: '3px 0', fontWeight: 600 }}>{d}</div>
               ))}
-              {abril2025.map(([day, type], i) => (
+              {calendarDays.map(([day, type], i) => (
                 <div key={i} style={{
                   fontSize: 12, textAlign: 'center', padding: '6px 2px', borderRadius: 6,
                   background: dayStyle[type].bg, color: dayStyle[type].color,
-                  cursor: type !== 'empty' && type !== 'gray' ? 'pointer' : 'default',
                   opacity: type === 'empty' ? 0 : 1,
                 }}>
                   {day === 0 ? '' : day}
@@ -167,7 +205,7 @@ export function EmpleadoDetalle({ empleadoId, onBack }: Props) {
               ))}
             </div>
             <div style={{ display: 'flex', gap: 12, marginTop: 10, flexWrap: 'wrap' }}>
-              {[['#dcfce7', 'Presente'], ['#fef3c7', 'Tardanza'], ['#fee2e2', 'Ausente'], ['#dbeafe', 'H. Extra'], ['#f0ede6', 'No laborable']].map(([bg, label]) => (
+              {[['#dcfce7', 'Presente'], ['#fef3c7', 'Tardanza'], ['#fee2e2', 'Ausente'], ['#dbeafe', 'H. Extra'], ['#f0ede6', 'No laborable'], ['#faf5ff', 'Hoy']].map(([bg, label]) => (
                 <span key={label} style={{ fontSize: 11, display: 'flex', alignItems: 'center', gap: 4, color: '#6b6b66' }}>
                   <span style={{ width: 10, height: 10, borderRadius: 2, background: bg, display: 'inline-block' }} />
                   {label}
@@ -212,6 +250,14 @@ export function EmpleadoDetalle({ empleadoId, onBack }: Props) {
           </div>
         </div>
       </div>
+
+      {showEdit && (
+        <EmpleadoFormModal
+          empleado={emp}
+          onClose={() => setShowEdit(false)}
+          onSave={updated => setData(d => ({ ...d!, emp: updated }))}
+        />
+      )}
 
       {selectedNov && createPortal(
         <div className="modal-overlay" style={{ position: 'fixed', inset: 0, background: 'rgba(26,24,20,0.38)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200, padding: 20 }}

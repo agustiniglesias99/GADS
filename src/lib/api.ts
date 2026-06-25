@@ -207,6 +207,18 @@ export async function createEmpleado(input: NuevoEmpleadoInput): Promise<Emplead
   return toEmpleado(unwrap(res))
 }
 
+export async function updateEmpleado(id: string, input: NuevoEmpleadoInput): Promise<Empleado> {
+  const iniciales = input.nombre.trim().split(/\s+/).map(w => w[0] ?? '').slice(0, 2).join('').toUpperCase()
+  const res = await supabase.from('empleados').update({
+    legajo: input.legajo, nombre: input.nombre, iniciales,
+    dni: input.dni, cuil: input.cuil, categoria: input.categoria,
+    jornada: input.jornada, ingreso: input.ingreso, convenio: input.convenio,
+    turno: input.turno, tolerancia: input.tolerancia, fichada: input.fichada,
+    estado: input.estado ?? 'activo', email: input.email,
+  }).eq('id', id).select().single()
+  return toEmpleado(unwrap(res))
+}
+
 export interface FichadaResult {
   accion: AccionFichada
   hora: string
