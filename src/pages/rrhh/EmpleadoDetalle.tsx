@@ -88,12 +88,34 @@ export function EmpleadoDetalle({ empleadoId, onBack }: Props) {
   const firstWeekday = new Date(year, month, 1).getDay()
   const offset = firstWeekday === 0 ? 6 : firstWeekday - 1
   const registroMap = new Map<number, string>(registrosMes.map(r => [parseInt(r.fecha.split('-')[2]), r.estado]))
+
+  // Superpone las novedades aprobadas (vacaciones/licencia/ausencia justificada) sobre
+  // el calendario, para que un día justificado no aparezca como ausente.
+  const novedadDayType: Partial<Record<TipoNovedad, DayType>> = {
+    vacaciones: 'info', licencia: 'info', ausencia_justificada: 'info',
+    ausencia_injustificada: 'danger',
+  }
+  const novedadMap = new Map<number, DayType>()
+  for (const n of novedadesData) {
+    if (n.estado !== 'aprobada' && n.estado !== 'justificada') continue
+    const dt = novedadDayType[n.tipo]
+    if (!dt) continue
+    const hasta = n.detalle.match(/(\d{4}-\d{2}-\d{2})\s*$/)
+    const end = hasta && hasta[1] >= n.fecha ? hasta[1] : n.fecha
+    for (let cur = new Date(n.fecha + 'T12:00:00'); cur <= new Date(end + 'T12:00:00'); cur.setDate(cur.getDate() + 1)) {
+      if (cur.getFullYear() === year && cur.getMonth() === month && !novedadMap.has(cur.getDate())) {
+        novedadMap.set(cur.getDate(), dt)
+      }
+    }
+  }
+
   const calendarDays: [number, DayType][] = Array.from({ length: offset }, () => [0, 'empty' as DayType])
   for (let d = 1; d <= lastDay; d++) {
     const w = new Date(year, month, d).getDay()
     const isWeekend = w === 0 || w === 6
     if (isWeekend) calendarDays.push([d, 'gray'])
     else if (registroMap.has(d)) calendarDays.push([d, estadoToDayType(registroMap.get(d)!)])
+    else if (novedadMap.has(d)) calendarDays.push([d, novedadMap.get(d)!])
     else if (d < todayNum) calendarDays.push([d, 'danger'])
     else if (d === todayNum) calendarDays.push([d, 'today'])
     else calendarDays.push([d, 'future'])
